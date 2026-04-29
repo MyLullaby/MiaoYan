@@ -57,7 +57,23 @@ jobs:
       - name: Build DMG (unsigned, ad-hoc)
         run: |
           chmod +x scripts/build.sh
+          # Run build.sh but tolerate the optional Sparkle sign_update step
+          # failing on CI (no EdDSA private key in Keychain). The DMG/ZIP is
+          # produced before that step, so the artifacts already exist.
+          set +e
           ./scripts/build.sh "${{ steps.ver.outputs.version }}"
+          STATUS=$?
+          set -e
+          if [ $STATUS -ne 0 ]; then
+            echo "build.sh exited with $STATUS — checking whether DMG/ZIP were produced before the failure..."
+            ls -lh "$HOME/Downloads" || true
+            if [ -f "$HOME/Downloads/MiaoYan.dmg" ] && [ -f "$HOME/Downloads/MiaoYan_V${{ steps.ver.outputs.version }}.zip" ]; then
+              echo "DMG and ZIP exist — treating Sparkle signing failure as non-fatal."
+            else
+              echo "Artifacts missing — failing the job."
+              exit $STATUS
+            fi
+          fi
 
       - name: Collect artifacts
         id: artifacts
