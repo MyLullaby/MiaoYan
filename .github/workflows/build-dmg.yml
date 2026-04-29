@@ -8,11 +8,22 @@ on:
         required: false
         default: ""
   push:
+    branches:
+      - main
     tags:
       - "v*"
+    paths-ignore:
+      - "**/*.md"
+      - "assets/**"
+      - ".github/workflows/sync-sponsors-svg.yml"
+      - ".github/workflows/update-sponsors.yml"
 
 permissions:
   contents: write
+
+concurrency:
+  group: build-dmg-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -36,7 +47,9 @@ jobs:
           elif [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             VERSION="${GITHUB_REF#refs/tags/v}"
           else
-            VERSION=$(grep "MARKETING_VERSION" MiaoYan.xcodeproj/project.pbxproj | head -1 | sed 's/.*= \(.*\);/\1/' | tr -d ' ')
+            BASE=$(grep "MARKETING_VERSION" MiaoYan.xcodeproj/project.pbxproj | head -1 | sed 's/.*= \(.*\);/\1/' | tr -d ' ')
+            SHORT_SHA="${GITHUB_SHA::7}"
+            VERSION="${BASE}-${SHORT_SHA}"
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Building version: $VERSION"
