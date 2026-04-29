@@ -28,11 +28,9 @@ if [ -z "$VERSION" ]; then
 fi
 
 APP_NAME="MiaoYan"
-ZIP_NAME="MiaoYan_V${VERSION}.zip"
 DMG_NAME="MiaoYan.dmg"
 DIST_DIR="./build/dist"
 STAGING_DIR="./build/dmg_staging"
-TEMP_DMG_PATH="./build/MiaoYan_temp.dmg"
 DMG_BASE_PATH="./build/${DMG_NAME%.dmg}"
 
 echo ""
@@ -74,11 +72,10 @@ codesign -v "./build/Release/MiaoYan.app" || {
 	exit 1
 }
 
-# ZIP
-(cd ./build/Release && zip -r -q "../$ZIP_NAME" MiaoYan.app)
+# ZIP — skipped on CI (DMG is the only artifact we need)
 
 # DMG — plain drag-to-Applications layout, no AppleScript
-rm -rf "$STAGING_DIR" "./build/$DMG_NAME" "$TEMP_DMG_PATH"
+rm -rf "$STAGING_DIR" "./build/$DMG_NAME"
 mkdir -p "$STAGING_DIR"
 cp -R "./build/Release/MiaoYan.app" "$STAGING_DIR/"
 ln -s /Applications "$STAGING_DIR/Applications"
@@ -108,13 +105,12 @@ if [ ! -f "./build/$DMG_NAME" ]; then
 fi
 
 rm -rf "$STAGING_DIR"
-xattr -cr "./build/$DMG_NAME" "./build/$ZIP_NAME"
+xattr -cr "./build/$DMG_NAME"
 
 # 5. Move to dist/
 echo "[5/5] Collecting artifacts..."
 mkdir -p "$DIST_DIR"
 mv "./build/$DMG_NAME" "$DIST_DIR/MiaoYan_V${VERSION}.dmg"
-mv "./build/$ZIP_NAME" "$DIST_DIR/$ZIP_NAME"
 
 echo ""
 echo -e "${GREEN}MiaoYan v$VERSION CI build succeeded!${NC}"

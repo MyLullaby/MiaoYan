@@ -31,8 +31,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app
+      - name: Select Xcode 26.2
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "26.2"
 
       - name: Show build environment
         run: |
@@ -65,7 +67,6 @@ jobs:
           VERSION="${{ steps.ver.outputs.version }}"
           mkdir -p dist
           cp "build/dist/MiaoYan_V${VERSION}.dmg" "dist/"
-          cp "build/dist/MiaoYan_V${VERSION}.zip" "dist/"
           ls -lh dist
           shasum -a 256 dist/* > dist/SHASUMS256.txt
           cat dist/SHASUMS256.txt
