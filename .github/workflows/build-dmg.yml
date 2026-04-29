@@ -1,0 +1,72 @@
+name: Build DMG
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version override (leave empty to use MARKETING_VERSION from project)"
+        required: false
+        default: ""
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Show build environment
+        run: |
+          xcodebuild -version
+          sw_vers
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION=$(grep "MARKETING_VERSION" MiaoYan.xcodeproj/project.pbxproj | head -1 | sed 's/.*= \(.*\);/\1/' | tr -d ' ')
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building version: $VERSION"
+
+      - name: Build DMG (unsigned, ad-hoc)
+        run: |
+          chmod +x scripts/build.sh
+          ./scripts/build.sh "${{ steps.ver.outputs.version }}"
+
+      - name: Collect artifacts
+        id: artifacts
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          mkdir -p dist
+          cp "$HOME/Downloads/MiaoYan.dmg" "dist/MiaoYan_V${VERSION}.dmg"
+          cp "$HOME/Downloads/MiaoYan_V${VERSION}.zip" "dist/MiaoYan_V${VERSION}.zip"
+          ls -lh dist
+          shasum -a 256 dist/* > dist/SHASUMS256.txt
+          cat dist/SHASUMS256.txt
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: MiaoYan-${{ steps.ver.outputs.version }}
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
