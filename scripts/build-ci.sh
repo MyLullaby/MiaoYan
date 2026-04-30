@@ -50,8 +50,7 @@ xcodebuild archive \
 	-archivePath "./build/MiaoYan.xcarchive" \
 	CODE_SIGN_IDENTITY="" \
 	CODE_SIGNING_REQUIRED=NO \
-	CODE_SIGNING_ALLOWED=NO \
-	2>&1 | grep -E "(error:|ARCHIVE)" || true
+	CODE_SIGNING_ALLOWED=NO
 
 [ ! -d "./build/MiaoYan.xcarchive" ] && echo -e "${RED}ERROR: Archive failed${NC}" && exit 1
 
