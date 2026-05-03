@@ -233,7 +233,10 @@ public class NotesTextProcessor {
     }
 
     @MainActor private static func calculatePerformanceState(attributedString: NSMutableAttributedString) -> HighlightPerformanceState {
-        let lineCount = attributedString.string.components(separatedBy: .newlines).count
+        var lineCount = 1
+        for char in attributedString.string.utf16 {
+            if char == 0x0A { lineCount += 1 }
+        }
         if lineCount > 5000 {
             return HighlightPerformanceState(simplified: true, skipCode: true)
         }

@@ -26,7 +26,7 @@ public class Note: NSObject {
 
     public var imageUrl: [URL]?
     public var isParsed = false
-    private var isContentLoaded = false
+    private(set) var isContentLoaded = false
 
     // Debounce for save operations
     private var saveWorkItem: DispatchWorkItem?

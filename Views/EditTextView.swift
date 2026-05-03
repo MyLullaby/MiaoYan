@@ -503,25 +503,25 @@ class EditTextView: NSTextView, @preconcurrency NSTextFinderClient {
         fillEpoch &+= 1
         let epoch = fillEpoch
         currentFillTask?.cancel()
-        currentFillTask = Task { @MainActor in
-            await _performFill(note: note, options: options, viewController: viewController, epoch: epoch)
+
+        if note.isContentLoaded {
+            applyNoteContent(note: note, options: options, viewController: viewController)
+        } else {
+            currentFillTask = Task { @MainActor in
+                await note.ensureContentLoadedAsync()
+                guard self.fillEpoch == epoch else { return }
+                self.applyNoteContent(note: note, options: options, viewController: viewController)
+            }
         }
     }
 
-    // Internal implementation method
-    private func _performFill(note: Note, options: FillOptions, viewController: ViewController, epoch: UInt64) async {
+    private func applyNoteContent(note: Note, options: FillOptions, viewController: ViewController) {
         if !isMagicPPTModeActive {
             viewController.titleBarView.isHidden = false
             viewController.titleLabel.isHidden = false
             viewController.titleBarView.alphaValue = 1
             viewController.titleLabel.alphaValue = 1
         }
-        await note.ensureContentLoadedAsync()
-        // After the async content load, verify this fill is still the active one.
-        // A newer fill task increments fillEpoch; if that has happened, this task
-        // must not touch EditTextView.note or textStorage -- doing so would race
-        // the newer task and corrupt saves.
-        guard self.fillEpoch == epoch else { return }
         UserDefaultsManagement.lastSelectedURL = note.url
         viewController.updateTitle(newTitle: note.getTitleWithoutLabel())
         if !options.preserveUndo {

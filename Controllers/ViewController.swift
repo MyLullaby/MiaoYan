@@ -733,13 +733,8 @@ class ViewController:
         // Unify button sizes: set all to 20x20 and remove borders/backgrounds for consistency
         let toolbarButtons = [formatButton, previewButton, presentationButton, toggleListButton, toggleSplitButton].compactMap { $0 }
         for btn in toolbarButtons {
-            if #available(macOS 26, *) {
-                btn.bezelStyle = .glass
-                btn.isBordered = true
-            } else {
-                btn.isBordered = false
-                btn.bezelStyle = .texturedRounded
-            }
+            btn.isBordered = false
+            btn.bezelStyle = .texturedRounded
             btn.contentTintColor = .secondaryLabelColor
             btn.imagePosition = .imageOnly
 
@@ -772,13 +767,8 @@ class ViewController:
         if toggleSplitButton == nil {
             let button = NSButton()
             button.translatesAutoresizingMaskIntoConstraints = false
-            if #available(macOS 26, *) {
-                button.bezelStyle = .glass
-                button.isBordered = true
-            } else {
-                button.bezelStyle = .texturedRounded
-                button.isBordered = false
-            }
+            button.bezelStyle = .texturedRounded
+            button.isBordered = false
 
             // Use custom icon (Static split icon for both states per user request)
             if let image = NSImage(named: "icon_editor_split") {
@@ -798,13 +788,8 @@ class ViewController:
         if toggleListButton == nil {
             let listButton = NSButton()
             listButton.translatesAutoresizingMaskIntoConstraints = false
-            if #available(macOS 26, *) {
-                listButton.bezelStyle = .glass
-                listButton.isBordered = true
-            } else {
-                listButton.bezelStyle = .texturedRounded
-                listButton.isBordered = false
-            }
+            listButton.bezelStyle = .texturedRounded
+            listButton.isBordered = false
             listButton.imagePosition = .imageOnly
 
             // Use custom icon

@@ -7,7 +7,6 @@ class OutlineHeaderView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
-        if #available(macOS 26, *), UserDefaultsManagement.appearanceType != .Custom { return }
         Theme.backgroundColor.setFill()
         dirtyRect.fill()
     }

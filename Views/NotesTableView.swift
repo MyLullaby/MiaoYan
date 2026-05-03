@@ -53,11 +53,7 @@ class NotesTableView: NSTableView {
     override func draw(_ dirtyRect: NSRect) {
         dataSource = adapter
         delegate = adapter
-        if #available(macOS 26, *), UserDefaultsManagement.appearanceType != .Custom {
-            backgroundColor = .clear
-        } else {
-            backgroundColor = Theme.backgroundColor
-        }
+        backgroundColor = Theme.backgroundColor
         super.draw(dirtyRect)
     }
 
@@ -247,7 +243,7 @@ class NotesTableView: NSTableView {
                 // before it writes the wrong bytes into the outgoing note's file.
                 if EditTextView.note?.isEqualURL(url: currentNote.url) == true {
                     vc.editArea.saveTextStorageContent(to: currentNote)
-                    currentNote.save()
+                    currentNote.save(content: currentNote.content)
                 } else {
                     let mismatch = NSError(
                         domain: "com.tw93.miaoyan.race",
@@ -261,21 +257,9 @@ class NotesTableView: NSTableView {
                 saveScrollPosition()
             }
 
-            loadingQueue.cancelAllOperations()
-            let operation = BlockOperation()
-            operation.addExecutionBlock { [weak self, weak vc] in
-                DispatchQueue.main.async {
-                    guard !operation.isCancelled, self?.fillTimestamp == timestamp, let vc = vc else {
-                        return
-                    }
-                    // Avoid filling during note creation to prevent content flashing
-                    if UserDataService.instance.shouldBlockEditAreaUpdate() {
-                        return
-                    }
-                    vc.editArea.fill(note: note, options: .silent)
-                }
+            if !UserDataService.instance.shouldBlockEditAreaUpdate() {
+                vc.editArea.fill(note: note, options: .silent)
             }
-            loadingQueue.addOperation(operation)
         } else {
             // UX: Auto-select first note to avoid empty editor (unified behavior)
             if !noteList.isEmpty {
