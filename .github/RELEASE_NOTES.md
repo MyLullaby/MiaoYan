@@ -1,17 +1,13 @@
-# V3.5.0
+# V3.5.1
 
-1. 新增版本历史功能,右键笔记可查看和恢复到任意历史版本
-2. 删除笔记改为移到系统废纸篓,误删可恢复
-3. 新增 Wikilink 双向链接,笔记面板展示反向链接
-4. 适配 macOS 26 玻璃质感工具栏
-5. 新增 iCloud 同步管理器,为后续多端同步打基础
-6. 开源版和 App Store 版恢复同步更新,共享同一份代码
+1. 修复 macOS 26 上工具栏按钮出现灰色背景条的问题
+2. 修复侧边栏和笔记列表在 macOS 26 上背景透明的问题
+3. 优化笔记切换速度,已加载笔记走同步路径,切换无延迟
+4. 切换笔记时保存改为异步防抖,不再阻塞主线程
 
 ---
 
-1. Version history: right-click a note to view and restore any previous version
-2. Notes are now moved to the system Trash instead of permanent deletion
-3. Wikilink support: note info panel shows backlinks
-4. macOS 26 glass toolbar adaptation
-5. iCloud sync manager, laying the groundwork for cross-device sync
-6. Open-source and App Store builds are now updated in sync, sharing the same codebase
+1. Fix toolbar buttons showing grey background bar on macOS 26
+2. Fix transparent sidebar and notes list background on macOS 26
+3. Faster note switching: synchronous path for loaded notes, zero delay
+4. Debounced save on note switch, no longer blocking main thread
