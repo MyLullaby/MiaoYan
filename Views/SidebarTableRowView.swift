@@ -1,6 +1,10 @@
 import Cocoa
 
 class SidebarTableRowView: ThemedTableRowView {
+    override func selectionBackgroundColor() -> NSColor {
+        Theme.sidebarSelectionBackgroundColor
+    }
+
     override func selectionRect() -> NSRect {
         let horizontalInset: CGFloat = 6
         let verticalInset: CGFloat = 3
@@ -19,6 +23,25 @@ class SidebarTableRowView: ThemedTableRowView {
         if isSelected {
             drawSelection(in: dirtyRect)
         }
+    }
+
+    override func drawSelection(in dirtyRect: NSRect) {
+        guard isSelected else { return }
+
+        let selectionRect = selectionRect()
+        let path = NSBezierPath(roundedRect: selectionRect, xRadius: 8, yRadius: 8)
+        selectionBackgroundColor().resolvedColor(for: effectiveAppearance).setFill()
+        path.fill()
+
+        guard Theme.usesModernSystemChrome else { return }
+
+        let backingScale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        let strokeWidth = 1 / backingScale
+        let strokeRect = selectionRect.insetBy(dx: strokeWidth / 2, dy: strokeWidth / 2)
+        let strokePath = NSBezierPath(roundedRect: strokeRect, xRadius: 8, yRadius: 8)
+        strokePath.lineWidth = strokeWidth
+        Theme.sidebarSelectionStrokeColor.resolvedColor(for: effectiveAppearance).setStroke()
+        strokePath.stroke()
     }
 
     private func indentationOffset() -> CGFloat {

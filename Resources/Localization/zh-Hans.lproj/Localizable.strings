@@ -282,3 +282,8 @@
 "Restored to version from %@" = "已恢复到 %@ 的版本";
 "No Version History" = "暂无历史版本";
 "Versions are saved automatically every 5 minutes while editing" = "编辑时每 5 分钟自动保存一个版本";
+"Words" = "字数";
+"Modified" = "修改";
+"Created" = "创建";
+"Backlinks" = "反向链接";
+"Project name" = "文件夹名称";

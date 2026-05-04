@@ -13,30 +13,29 @@ final class PrefsWindowController: NSWindowController, NSWindowDelegate {
 
     private var currentCategory: PreferencesCategory = .general
     private var hasPreparedWindowForDisplay = false
-    private var hasRestoredAutosavedFrame = false
+
+    private enum Metrics {
+        static let windowSize = NSSize(width: 800, height: 520)
+        static let sidebarWidth: CGFloat = 176
+    }
 
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 780, height: 600),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            contentRect: NSRect(origin: .zero, size: Metrics.windowSize),
+            styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
 
-        window.minSize = NSSize(width: 700, height: 600)
-        window.maxSize = NSSize(width: 1200, height: 600)
+        window.minSize = Metrics.windowSize
+        window.maxSize = Metrics.windowSize
 
-        window.styleMask.remove(.resizable)
         window.styleMask.insert(.titled)
         window.styleMask.insert(.closable)
-        window.styleMask.insert(.miniaturizable)
-        let autosaveName: NSWindow.FrameAutosaveName = "ModernPreferencesWindow"
-        let restoredFrame = window.setFrameUsingName(autosaveName)
-        window.setFrameAutosaveName(autosaveName)
+        window.styleMask.insert(.fullSizeContentView)
         window.isReleasedWhenClosed = false
 
         self.init(window: window)
-        hasRestoredAutosavedFrame = restoredFrame
 
         setupUIComponents()
     }
@@ -62,8 +61,10 @@ final class PrefsWindowController: NSWindowController, NSWindowDelegate {
 
         window?.titleVisibility = .hidden
         window?.titlebarAppearsTransparent = true
-        window?.title = ""
+        window?.title = currentCategory.title
         window?.toolbarStyle = .preference
+        window?.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        window?.standardWindowButton(.zoomButton)?.isHidden = true
     }
 
     private func setupWindow() {
@@ -91,17 +92,18 @@ final class PrefsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func setupSidebar() {
-        sidebarView = PrefsSidebarView(frame: NSRect(x: 0, y: 0, width: 160, height: 480))
+        sidebarView = PrefsSidebarView(frame: NSRect(x: 0, y: 0, width: Metrics.sidebarWidth, height: Metrics.windowSize.height))
         sidebarView.delegate = self
 
         sidebarViewController = NSViewController()
         sidebarViewController.view = sidebarView
 
-        let sidebarItem = NSSplitViewItem(sidebarWithViewController: sidebarViewController)
-        sidebarItem.minimumThickness = 160
-        sidebarItem.maximumThickness = 160
+        let sidebarItem = NSSplitViewItem(viewController: sidebarViewController)
+        sidebarItem.minimumThickness = Metrics.sidebarWidth
+        sidebarItem.maximumThickness = Metrics.sidebarWidth
         sidebarItem.canCollapse = false
 
+        sidebarItem.allowsFullHeightLayout = true
         sidebarItem.titlebarSeparatorStyle = .none
 
         splitViewController.addSplitViewItem(sidebarItem)
@@ -109,14 +111,12 @@ final class PrefsWindowController: NSWindowController, NSWindowDelegate {
 
     private func setupContent() {
         prefsContentViewController = NSViewController()
-        let contentView = PrefsContentBackgroundView(frame: NSRect(x: 0, y: 0, width: 600, height: 480))
-
-        contentView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            contentView.widthAnchor.constraint(equalToConstant: 600),
-            contentView.heightAnchor.constraint(equalToConstant: 480),
-        ])
-
+        let contentView = PrefsContentBackgroundView(frame: NSRect(
+            x: 0,
+            y: 0,
+            width: Metrics.windowSize.width - Metrics.sidebarWidth,
+            height: Metrics.windowSize.height
+        ))
         prefsContentViewController.view = contentView
 
         let contentItem = NSSplitViewItem(viewController: prefsContentViewController)
@@ -134,6 +134,7 @@ final class PrefsWindowController: NSWindowController, NSWindowDelegate {
         }
 
         let newVC = viewController(for: category)
+        window?.title = category.title
 
         prefsContentViewController.addChild(newVC)
 
@@ -227,7 +228,7 @@ extension PrefsWindowController {
         let effectiveAppearance = window.effectiveAppearance
         var backgroundColor: NSColor = .windowBackgroundColor
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            backgroundColor = NSColor(named: "mainBackground") ?? .windowBackgroundColor
+            backgroundColor = Theme.settingsWindowBackgroundColor
         }
 
         window.backgroundColor = backgroundColor
@@ -235,6 +236,8 @@ extension PrefsWindowController {
 }
 
 private final class PrefsContentBackgroundView: NSView {
+    override var isFlipped: Bool { true }
+
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         commonInit()
@@ -262,7 +265,7 @@ private final class PrefsContentBackgroundView: NSView {
 
     private func updateColors() {
         let appearance = window?.effectiveAppearance ?? effectiveAppearance
-        let resolvedColor = Theme.backgroundColor.resolvedColor(for: appearance)
+        let resolvedColor = Theme.settingsContentBackgroundColor.resolvedColor(for: appearance)
         layer?.backgroundColor = resolvedColor.cgColor
     }
 }
@@ -270,21 +273,40 @@ private final class PrefsContentBackgroundView: NSView {
 // MARK: - Custom SplitView for Preferences
 final class PrefsSplitView: NSSplitView {
     override func drawDivider(in rect: NSRect) {
-        let appearance = window?.effectiveAppearance ?? effectiveAppearance
+        Theme.settingsDividerColor.resolvedColor(for: effectiveAppearance).setFill()
 
-        // Get divider color in the correct appearance context
-        var dividerColor: NSColor = .separatorColor
-        appearance.performAsCurrentDrawingAppearance {
-            dividerColor = NSColor(named: "divider") ?? .separatorColor
+        guard Theme.usesModernSystemChrome else {
+            rect.fill()
+            return
         }
 
-        dividerColor.setFill()
-        rect.fill()
+        NSBezierPath(rect: hairlineRect(in: rect)).fill()
     }
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         needsDisplay = true
+    }
+
+    private func hairlineRect(in rect: NSRect) -> NSRect {
+        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        let thickness = 1 / scale
+
+        if isVertical {
+            return NSRect(
+                x: rect.midX - thickness / 2,
+                y: rect.minY,
+                width: thickness,
+                height: rect.height
+            )
+        }
+
+        return NSRect(
+            x: rect.minX,
+            y: rect.midY - thickness / 2,
+            width: rect.width,
+            height: thickness
+        )
     }
 }
 
@@ -295,9 +317,8 @@ extension PrefsWindowController {
         window.contentView?.layoutSubtreeIfNeeded()
 
         if !hasPreparedWindowForDisplay {
-            if !hasRestoredAutosavedFrame {
-                window.center()
-            }
+            window.setContentSize(Metrics.windowSize)
+            window.center()
             hasPreparedWindowForDisplay = true
         }
     }

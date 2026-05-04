@@ -29,22 +29,7 @@ class NoteRowView: ThemedTableRowView {
         var parentView: NSView? = superview
         while parentView != nil {
             if let tableView = parentView as? NotesTableView {
-                guard !tableView.selectedRowIndexes.isEmpty else {
-                    return false
-                }
-
-                let selectedRow = tableView.selectedRowIndexes.first!
-                let currentRowIndex = tableView.row(for: self)
-
-                if currentRowIndex == selectedRow - 1 {
-                    return true
-                }
-
-                if currentRowIndex == selectedRow + 1 {
-                    return true
-                }
-
-                return false
+                return tableView.shouldHideNoteSeparator(for: self)
             }
             parentView = parentView?.superview
         }
@@ -61,7 +46,7 @@ class NoteRowView: ThemedTableRowView {
             height: separatorHeight
         )
 
-        var dividerColor = Theme.dividerColor
+        var dividerColor = Theme.noteSeparatorColor
         let app = self.effectiveAppearance
         var cg: CGColor?
         app.performAsCurrentDrawingAppearance {

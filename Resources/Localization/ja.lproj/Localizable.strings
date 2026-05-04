@@ -282,3 +282,8 @@
 "Restored to version from %@" = "%@ のバージョンに復元しました";
 "No Version History" = "バージョン履歴はありません";
 "Versions are saved automatically every 5 minutes while editing" = "編集中は5分ごとに自動保存されます";
+"Words" = "文字数";
+"Modified" = "更新";
+"Created" = "作成";
+"Backlinks" = "バックリンク";
+"Project name" = "フォルダ名";

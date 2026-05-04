@@ -570,13 +570,12 @@ public class Note: NSObject {
             AppDelegate.trackError(error, context: "Note.writeError")
             AppDelegate.trackError(error, context: "Note.write")
 
-            DispatchQueue.main.async {
-                let alert = NSAlert()
-                alert.messageText = I18n.str("Save Failed")
-                alert.informativeText = I18n.str(error.localizedDescription)
-                alert.alertStyle = .warning
-                alert.addButton(withTitle: I18n.str("OK"))
-                alert.runModal()
+            Task { @MainActor in
+                MiaoYanAlert.show(
+                    message: I18n.str("Save Failed"),
+                    informativeText: I18n.str(error.localizedDescription),
+                    style: .warning
+                )
             }
             return
         }

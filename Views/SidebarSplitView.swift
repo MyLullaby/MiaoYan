@@ -6,7 +6,7 @@ class SidebarSplitView: ThemedSplitView {
 
     override func currentDividerColor() -> NSColor {
         let sidebarWidth = subviews.first?.frame.width ?? 0
-        return sidebarWidth == 0 ? Theme.backgroundColor : Theme.dividerColor
+        return sidebarWidth == 0 ? Theme.paneBackgroundColor : Theme.splitDividerColor
     }
 
     func splitView(_ splitView: NSSplitView, constrainSplitPosition proposedPosition: CGFloat, ofSubviewAt dividerIndex: Int) -> CGFloat {

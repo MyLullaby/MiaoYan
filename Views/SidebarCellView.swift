@@ -81,9 +81,11 @@ class SidebarCellView: NSTableCellView {
 
         } catch {
             sender.stringValue = project.url.lastPathComponent
-            let alert = NSAlert()
-            alert.messageText = error.localizedDescription
-            alert.runModal()
+            MiaoYanAlert.show(
+                message: error.localizedDescription,
+                style: .warning,
+                for: window
+            )
         }
 
         guard let vc = window?.contentViewController as? ViewController else { return }

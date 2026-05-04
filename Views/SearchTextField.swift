@@ -13,6 +13,11 @@ class SearchFieldCell: NSSearchFieldCell {
     }
 
     override func draw(withFrame cellFrame: NSRect, in controlView: NSView) {
+        if Theme.usesModernSystemChrome {
+            super.draw(withFrame: cellFrame, in: controlView)
+            return
+        }
+
         let insetFrame = cellFrame.insetBy(dx: 0.5, dy: 0.5)
         drawBackground(in: insetFrame)
         drawBorder(in: insetFrame, appearance: controlView.effectiveAppearance)
@@ -43,6 +48,10 @@ class SearchFieldCell: NSSearchFieldCell {
     }
 
     override func searchTextRect(forBounds rect: NSRect) -> NSRect {
+        if Theme.usesModernSystemChrome {
+            return verticallyCentered(super.searchTextRect(forBounds: rect), in: rect, height: textLineHeight())
+        }
+
         return NSRect(
             x: rect.origin.x + Self.padding,
             y: rect.origin.y + (rect.height - Self.lineHeight) / 2,
@@ -52,8 +61,24 @@ class SearchFieldCell: NSSearchFieldCell {
     }
 
     override func drawingRect(forBounds rect: NSRect) -> NSRect {
+        if Theme.usesModernSystemChrome {
+            return searchTextRect(forBounds: rect)
+        }
+
         // Same as searchTextRect for placeholder
         return searchTextRect(forBounds: rect)
+    }
+
+    private func textLineHeight() -> CGFloat {
+        guard let font else { return Self.lineHeight }
+        return ceil(font.ascender - font.descender + font.leading)
+    }
+
+    private func verticallyCentered(_ proposedRect: NSRect, in bounds: NSRect, height: CGFloat) -> NSRect {
+        var centeredRect = proposedRect
+        centeredRect.size.height = min(height, bounds.height)
+        centeredRect.origin.y = bounds.origin.y + (bounds.height - centeredRect.height) / 2
+        return centeredRect
     }
 }
 
@@ -103,13 +128,17 @@ class SearchTextField: NSSearchField, NSSearchFieldDelegate {
 
     @MainActor private func configureSearchField() {
         if let searchFieldCell = self.cell as? NSSearchFieldCell {
-            searchFieldCell.searchButtonCell = nil
-            searchFieldCell.cancelButtonCell = nil
+            if !Theme.usesModernSystemChrome {
+                searchFieldCell.searchButtonCell = nil
+                searchFieldCell.cancelButtonCell = nil
+            }
             searchFieldCell.placeholderString = I18n.str("Search")
         }
 
         sendsWholeSearchString = false
         sendsSearchStringImmediately = true
+        drawsBackground = true
+        Theme.configureModernControlMetrics(self)
         invalidateIntrinsicContentSize()
     }
 

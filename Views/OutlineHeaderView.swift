@@ -7,13 +7,13 @@ class OutlineHeaderView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
-        Theme.backgroundColor.setFill()
-        dirtyRect.fill()
+        fillMiaoYanPaneBackground(dirtyRect)
     }
 
     override func awakeFromNib() {
         super.awakeFromNib()
         MainActor.assumeIsolated { [self] in
+            applyMiaoYanPaneBackground()
             addTrackingArea(NSTrackingArea(rect: bounds, options: [.activeAlways, .mouseEnteredAndExited], owner: self, userInfo: nil))
         }
     }

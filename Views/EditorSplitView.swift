@@ -7,7 +7,7 @@ class EditorSplitView: ThemedSplitView {
     override func currentDividerColor() -> NSColor {
         let notelistWidth = subviews.first?.frame.width ?? 0
         let hideDivider = notelistWidth == 0 || shouldHideDivider
-        return hideDivider ? Theme.backgroundColor : Theme.dividerColor
+        return hideDivider ? Theme.paneBackgroundColor : Theme.splitDividerColor
     }
 
     override func minPossiblePositionOfDivider(at dividerIndex: Int) -> CGFloat {

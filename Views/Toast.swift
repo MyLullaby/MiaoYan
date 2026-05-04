@@ -138,13 +138,28 @@ final class ToastManager {
         toast.layer?.masksToBounds = true
         toast.layer?.opacity = 0
 
-        if !toast.subviews.contains(where: { $0.wantsLayer && $0.layer?.backgroundColor != nil }) {
-            let backgroundView = NSView()
+        if !toast.subviews.contains(where: { $0.identifier?.rawValue == "ToastBackgroundView" }) {
+            let backgroundView: NSView
+            if Theme.usesModernSystemChrome {
+                let effectView = NSVisualEffectView()
+                effectView.material = .hudWindow
+                effectView.blendingMode = .withinWindow
+                effectView.state = .active
+                effectView.wantsLayer = true
+                backgroundView = effectView
+            } else {
+                let plainView = NSView()
+                plainView.wantsLayer = true
+                plainView.layer = CALayer()
+                plainView.layer?.backgroundColor = Theme.toastBackgroundColor.cgColor
+                backgroundView = plainView
+            }
+
+            backgroundView.identifier = NSUserInterfaceItemIdentifier("ToastBackgroundView")
             backgroundView.translatesAutoresizingMaskIntoConstraints = false
-            backgroundView.wantsLayer = true
-            backgroundView.layer = CALayer()
-            backgroundView.layer?.backgroundColor = Theme.toastBackgroundColor.cgColor
             backgroundView.layer?.cornerRadius = configuration.cornerRadius
+            backgroundView.layer?.borderWidth = Theme.usesModernSystemChrome ? 0.5 : 0
+            backgroundView.layer?.borderColor = Theme.panelHairlineColor.resolvedColor(for: view.effectiveAppearance).cgColor
 
             toast.addSubview(backgroundView, positioned: .below, relativeTo: nil)
             NSLayoutConstraint.activate([
@@ -183,7 +198,7 @@ final class ToastManager {
         anim.fillMode = .removed
         anim.calculationMode = .linear
 
-        toast.layer?.borderWidth = 0.5
+        toast.layer?.borderWidth = Theme.usesModernSystemChrome ? 0 : 0.5
         toast.layer?.borderColor = NSColor.white.withAlphaComponent(0.12).cgColor
 
         CATransaction.begin()

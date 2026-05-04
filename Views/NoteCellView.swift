@@ -44,12 +44,17 @@ class NoteCellView: NSTableCellView {
         name.addCharacterSpacing()
         date.addCharacterSpacing()
 
-        if backgroundStyle == NSView.BackgroundStyle.emphasized {
-            date.textColor = Theme.selectionTextColor
-            name.textColor = Theme.selectionTextColor
-        } else {
-            date.textColor = Theme.secondaryTextColor
-            name.textColor = Theme.textColor
+        applyTextColor(Theme.secondaryTextColor, to: date)
+        applyTextColor(Theme.textColor, to: name)
+    }
+
+    private func applyTextColor(_ color: NSColor, to field: NSTextField) {
+        field.textColor = color
+        let attributed = NSMutableAttributedString(attributedString: field.attributedStringValue)
+        let range = NSRange(location: 0, length: attributed.length)
+        if range.length > 0 {
+            attributed.addAttribute(.foregroundColor, value: color, range: range)
+            field.attributedStringValue = attributed
         }
     }
 

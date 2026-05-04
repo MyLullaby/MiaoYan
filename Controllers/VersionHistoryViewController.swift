@@ -1,6 +1,105 @@
 import AppKit
 
 @MainActor
+private final class VersionHistoryBackgroundView: NSView {
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        commonInit()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        updateColor()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateColor()
+    }
+
+    private func commonInit() {
+        wantsLayer = true
+        updateColor()
+    }
+
+    private func updateColor() {
+        let appearance = window?.effectiveAppearance ?? effectiveAppearance
+        layer?.backgroundColor = Theme.panelBackgroundColor.resolvedColor(for: appearance).cgColor
+    }
+}
+
+@MainActor
+private final class VersionHistorySecondaryBackgroundView: NSView {
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        commonInit()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        updateColor()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateColor()
+    }
+
+    private func commonInit() {
+        wantsLayer = true
+        updateColor()
+    }
+
+    private func updateColor() {
+        let appearance = window?.effectiveAppearance ?? effectiveAppearance
+        layer?.backgroundColor = Theme.panelSecondaryBackgroundColor.resolvedColor(for: appearance).cgColor
+    }
+}
+
+@MainActor
+private final class VersionHistoryHairlineView: NSView {
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        commonInit()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        updateColor()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateColor()
+    }
+
+    private func commonInit() {
+        wantsLayer = true
+        updateColor()
+    }
+
+    private func updateColor() {
+        let appearance = window?.effectiveAppearance ?? effectiveAppearance
+        layer?.backgroundColor = Theme.panelHairlineColor.resolvedColor(for: appearance).cgColor
+    }
+}
+
+@MainActor
 final class VersionHistoryViewController: NSViewController {
 
     private enum VersionEntry {
@@ -43,7 +142,7 @@ final class VersionHistoryViewController: NSViewController {
     }
 
     override func loadView() {
-        view = NSView(frame: NSRect(x: 0, y: 0, width: 660, height: 440))
+        view = VersionHistoryBackgroundView(frame: NSRect(x: 0, y: 0, width: 660, height: 440))
         preferredContentSize = NSSize(width: 660, height: 440)
     }
 
@@ -211,10 +310,8 @@ final class VersionHistoryViewController: NSViewController {
 
     private func buildContent() -> NSView {
         // ── left sidebar background
-        let sidebarBg = NSView()
+        let sidebarBg = VersionHistorySecondaryBackgroundView()
         sidebarBg.translatesAutoresizingMaskIntoConstraints = false
-        sidebarBg.wantsLayer = true
-        sidebarBg.layer?.backgroundColor = NSColor.separatorColor.withAlphaComponent(0.06).cgColor
 
         let tableColumn = NSTableColumn(identifier: .init("v"))
         tableColumn.title = ""
@@ -243,9 +340,7 @@ final class VersionHistoryViewController: NSViewController {
         ])
 
         // ── vertical divider
-        let vDiv = NSBox()
-        vDiv.translatesAutoresizingMaskIntoConstraints = false
-        vDiv.boxType = .separator
+        let vDiv = makeSeparator()
 
         // ── preview
         previewTextView.isEditable = false
@@ -326,10 +421,9 @@ final class VersionHistoryViewController: NSViewController {
     }
 
     private func makeSeparator() -> NSView {
-        let b = NSBox()
-        b.translatesAutoresizingMaskIntoConstraints = false
-        b.boxType = .separator
-        return b
+        let line = VersionHistoryHairlineView()
+        line.translatesAutoresizingMaskIntoConstraints = false
+        return line
     }
 
     // MARK: - Data helpers
@@ -456,8 +550,18 @@ private final class VersionHistoryRowView: NSTableRowView {
     override func drawSelection(in dirtyRect: NSRect) {
         let rect = bounds.insetBy(dx: 6, dy: 3)
         let path = NSBezierPath(roundedRect: rect, xRadius: 7, yRadius: 7)
-        Theme.selectionBackgroundColor.setFill()
+        Theme.sidebarSelectionBackgroundColor.resolvedColor(for: effectiveAppearance).setFill()
         path.fill()
+
+        guard Theme.usesModernSystemChrome else { return }
+
+        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        let strokeWidth = 1 / scale
+        let strokeRect = rect.insetBy(dx: strokeWidth / 2, dy: strokeWidth / 2)
+        let strokePath = NSBezierPath(roundedRect: strokeRect, xRadius: 7, yRadius: 7)
+        strokePath.lineWidth = strokeWidth
+        Theme.sidebarSelectionStrokeColor.resolvedColor(for: effectiveAppearance).setStroke()
+        strokePath.stroke()
     }
 }
 
@@ -530,4 +634,3 @@ private final class VersionHistoryCellView: NSView {
             : Theme.secondaryTextColor.withAlphaComponent(0.4).cgColor
     }
 }
-

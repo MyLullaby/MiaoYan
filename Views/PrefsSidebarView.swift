@@ -7,10 +7,15 @@ protocol PrefsSidebarDelegate: AnyObject {
 }
 
 // MARK: - Preferences Sidebar View
-final class PrefsSidebarView: NSView {
+final class PrefsSidebarView: NSVisualEffectView {
+    private enum Metrics {
+        static let contentTopInset: CGFloat = 58
+    }
+
     weak var delegate: PrefsSidebarDelegate?
     private var tableView: NSTableView!
     private var scrollView: NSScrollView!
+    private var scrollViewTopConstraint: NSLayoutConstraint!
     private var categories: [PreferencesCategory] = PreferencesCategory.allCases
     private var selectedCategory: PreferencesCategory = .general
 
@@ -65,22 +70,26 @@ final class PrefsSidebarView: NSView {
         column.title = ""
         column.isEditable = false
         column.resizingMask = .autoresizingMask
+        column.width = bounds.width
         tableView.addTableColumn(column)
+        tableView.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
 
         scrollView.documentView = tableView
     }
 
     private func setupConstraints() {
+        scrollViewTopConstraint = scrollView.topAnchor.constraint(equalTo: topAnchor, constant: Metrics.contentTopInset)
         NSLayoutConstraint.activate([
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            scrollView.topAnchor.constraint(equalTo: topAnchor),
+            scrollViewTopConstraint,
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
     }
 
     private func setupAppearance() {
         wantsLayer = true
+        configureMaterial()
         updateColors()
     }
 
@@ -94,15 +103,18 @@ final class PrefsSidebarView: NSView {
         updateColors()
     }
 
+    override func layout() {
+        super.layout()
+        tableView.frame = scrollView.contentView.bounds
+        tableView.tableColumns.first?.width = tableView.bounds.width
+    }
+
     private func updateColors() {
         guard let tableView else { return }
         let appearance = window?.effectiveAppearance ?? effectiveAppearance
+        configureMaterial()
 
-        // Resolve the background color in the correct appearance context
-        var backgroundColor: NSColor = .windowBackgroundColor
-        appearance.performAsCurrentDrawingAppearance {
-            backgroundColor = NSColor(named: "mainBackground") ?? .windowBackgroundColor
-        }
+        let backgroundColor = Theme.settingsSidebarBackgroundColor.resolvedColor(for: appearance)
 
         layer?.backgroundColor = backgroundColor.cgColor
         tableView.backgroundColor = backgroundColor
@@ -112,8 +124,22 @@ final class PrefsSidebarView: NSView {
             rowView.needsDisplay = true
             // Force cell views to update their text colors immediately
             for case let cellView as PrefsSidebarCellView in rowView.subviews {
-                cellView.refreshTextColor()
+                cellView.setSelected(rowView.isSelected)
             }
+        }
+    }
+
+    private func configureMaterial() {
+        if Theme.usesModernSystemChrome {
+            material = .sidebar
+            blendingMode = .behindWindow
+            state = .active
+            isEmphasized = false
+            layer?.backgroundColor = NSColor.clear.cgColor
+        } else {
+            material = .contentBackground
+            blendingMode = .withinWindow
+            state = .inactive
         }
     }
 
@@ -175,7 +201,11 @@ extension PrefsSidebarView: NSTableViewDelegate {
 
 // MARK: - Preferences Sidebar Cell View
 final class PrefsSidebarCellView: NSTableCellView {
+    private var iconView: NSImageView!
     private var titleLabel: NSTextField!
+    private var iconWidthConstraint: NSLayoutConstraint!
+    private var labelLeadingConstraint: NSLayoutConstraint!
+    private var isRowSelected = false
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -188,6 +218,13 @@ final class PrefsSidebarCellView: NSTableCellView {
     }
 
     private func setupViews() {
+        iconView = NSImageView()
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+        iconView.imageScaling = .scaleProportionallyUpOrDown
+        iconView.setAccessibilityElement(false)
+        iconView.setContentHuggingPriority(.required, for: .horizontal)
+        iconView.setContentCompressionResistancePriority(.required, for: .horizontal)
+
         titleLabel = NSTextField()
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.isEditable = false
@@ -195,15 +232,29 @@ final class PrefsSidebarCellView: NSTableCellView {
         titleLabel.isBordered = false
         titleLabel.backgroundColor = NSColor.clear
         titleLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        titleLabel.usesSingleLineMode = true
+        titleLabel.lineBreakMode = .byTruncatingTail
+        titleLabel.maximumNumberOfLines = 1
+        titleLabel.cell?.wraps = false
+        titleLabel.cell?.isScrollable = true
         updateTextColor()
+        addSubview(iconView)
         addSubview(titleLabel)
 
         setupConstraints()
     }
 
     private func setupConstraints() {
+        iconWidthConstraint = iconView.widthAnchor.constraint(equalToConstant: 15)
+        labelLeadingConstraint = titleLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 8)
+
         NSLayoutConstraint.activate([
-            titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
+            iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
+            iconView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            iconWidthConstraint,
+            iconView.heightAnchor.constraint(equalToConstant: 15),
+
+            labelLeadingConstraint,
             titleLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
             titleLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
         ])
@@ -211,6 +262,32 @@ final class PrefsSidebarCellView: NSTableCellView {
 
     func configure(with category: PreferencesCategory) {
         titleLabel.stringValue = category.title
+
+        if let assetName = category.iconAssetName,
+            let image = NSImage(named: assetName)
+        {
+            iconView.image = image
+            iconView.image?.isTemplate = true
+            iconView.isHidden = false
+            iconWidthConstraint.constant = 15
+            labelLeadingConstraint.constant = 8
+        } else if #available(macOS 11.0, *),
+            let image = NSImage(systemSymbolName: category.systemSymbolName, accessibilityDescription: category.title)
+        {
+            let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .medium)
+            iconView.image = image.withSymbolConfiguration(config) ?? image
+            iconView.image?.isTemplate = true
+            iconView.isHidden = false
+            iconWidthConstraint.constant = 15
+            labelLeadingConstraint.constant = 8
+        } else {
+            iconView.image = nil
+            iconView.isHidden = true
+            iconWidthConstraint.constant = 0
+            labelLeadingConstraint.constant = 0
+        }
+
+        updateTextColor()
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -225,17 +302,36 @@ final class PrefsSidebarCellView: NSTableCellView {
     }
 
     private func updateTextColor() {
-        if backgroundStyle == .emphasized {
-            // Selected: use contrasting text color based on selection background
-            let appearance = window?.effectiveAppearance ?? effectiveAppearance
-            titleLabel.textColor = appearance.isDark ? .white : .black
+        let appearance = window?.effectiveAppearance ?? effectiveAppearance
+        if isRowSelected || backgroundStyle == .emphasized {
+            let color = selectedTextColor(for: appearance)
+            titleLabel.textColor = color
+            iconView.contentTintColor = color
         } else {
-            // Unselected: use secondary label color for subtle appearance
-            titleLabel.textColor = .secondaryLabelColor
+            let color = Theme.secondaryTextColor.resolvedColor(for: appearance)
+            titleLabel.textColor = color
+            iconView.contentTintColor = color
         }
     }
 
+    private func selectedTextColor(for appearance: NSAppearance?) -> NSColor {
+        if UserDefaultsManagement.appearanceType == .Custom {
+            return Theme.textColor.resolvedColor(for: appearance)
+        }
+
+        if appearance?.isDark == true {
+            return NSColor(calibratedWhite: 0.92, alpha: 1)
+        }
+
+        return NSColor(calibratedWhite: 0.18, alpha: 1)
+    }
+
     func refreshTextColor() {
+        updateTextColor()
+    }
+
+    func setSelected(_ selected: Bool) {
+        isRowSelected = selected
         updateTextColor()
     }
 }
@@ -243,7 +339,7 @@ final class PrefsSidebarCellView: NSTableCellView {
 // MARK: - Preferences Sidebar Row View
 final class PrefsSidebarRowView: NSTableRowView {
     override var isEmphasized: Bool {
-        get { return isSelected }
+        get { false }
         set {}
     }
 
@@ -264,14 +360,20 @@ final class PrefsSidebarRowView: NSTableRowView {
     override func drawSelection(in dirtyRect: NSRect) {
         guard isSelected else { return }
 
-        // Resolve color in current appearance context
-        let appearance = window?.effectiveAppearance ?? effectiveAppearance
-        let selectionColor = Theme.selectionBackgroundColor.resolvedColor(for: appearance)
-
-        selectionColor.setFill()
         let selectionRect = bounds.insetBy(dx: 8, dy: 2)
         let path = NSBezierPath(roundedRect: selectionRect, xRadius: 6, yRadius: 6)
+        Theme.sidebarSelectionBackgroundColor.resolvedColor(for: effectiveAppearance).setFill()
         path.fill()
+
+        guard Theme.usesModernSystemChrome else { return }
+
+        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        let strokeWidth = 1 / scale
+        let strokeRect = selectionRect.insetBy(dx: strokeWidth / 2, dy: strokeWidth / 2)
+        let strokePath = NSBezierPath(roundedRect: strokeRect, xRadius: 6, yRadius: 6)
+        strokePath.lineWidth = strokeWidth
+        Theme.sidebarSelectionStrokeColor.resolvedColor(for: effectiveAppearance).setStroke()
+        strokePath.stroke()
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -294,7 +396,7 @@ final class PrefsSidebarRowView: NSTableRowView {
     private func updateCellTextColors() {
         // Force cell views to update their text colors immediately
         for case let cellView as PrefsSidebarCellView in subviews {
-            cellView.refreshTextColor()
+            cellView.setSelected(isSelected)
         }
     }
 }

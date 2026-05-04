@@ -26,10 +26,14 @@ class ThemedTableRowView: NSTableRowView {
         return bounds
     }
 
+    func selectionBackgroundColor() -> NSColor {
+        Theme.selectionBackgroundColor
+    }
+
     override func drawSelection(in dirtyRect: NSRect) {
         if isSelected {
             let path = NSBezierPath(roundedRect: selectionRect(), xRadius: 8, yRadius: 8)
-            Theme.selectionBackgroundColor.setFill()
+            selectionBackgroundColor().resolvedColor(for: effectiveAppearance).setFill()
             path.fill()
         }
     }

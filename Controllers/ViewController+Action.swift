@@ -10,8 +10,6 @@ extension ViewController {
     }
 
     @IBAction func showInfo(_ sender: Any) {
-        popover.appearance = NSAppearance(named: NSAppearance.Name.aqua)!
-
         let selectedCell = notesTableView.view(atColumn: 0, row: notesTableView.selectedRow, makeIfNecessary: false)
 
         guard let positioningView = selectedCell else {
@@ -165,14 +163,11 @@ extension ViewController {
         let isSoftRename = note.url.lastPathComponent.lowercased() == newName.lowercased()
 
         if note.project.fileExist(fileName: value, ext: note.url.pathExtension), !isSoftRename {
-            alert = NSAlert()
-            guard let alert = alert else {
-                return
-            }
-
-            alert.messageText = I18n.str("Duplicate note name")
-            alert.informativeText = String(format: I18n.str("Note \"%@\" already exists"), value)
-            alert.runModal()
+            MiaoYanAlert.show(
+                message: I18n.str("Duplicate note name"),
+                informativeText: String(format: I18n.str("Note \"%@\" already exists"), value),
+                for: view.window
+            )
 
             note.parseURL()
             sender.stringValue = note.getTitleWithoutLabel()
@@ -265,15 +260,15 @@ extension ViewController {
     }
 
     private func showReloadConfirmation(note: Note) {
-        let alert = NSAlert()
-        alert.messageText = I18n.str("Reload Note")
-        alert.informativeText = I18n.str("You have unsaved changes. Reload will discard them.")
-        alert.addButton(withTitle: I18n.str("Reload"))
-        alert.addButton(withTitle: I18n.str("Cancel"))
-        alert.alertStyle = .warning
-
-        if alert.runModal() == .alertFirstButtonReturn {
-            reloadNoteFromDisk(note)
+        MiaoYanAlert.confirm(
+            message: I18n.str("Reload Note"),
+            informativeText: I18n.str("You have unsaved changes. Reload will discard them."),
+            confirmTitle: I18n.str("Reload"),
+            for: view.window
+        ) { [weak self] confirmed in
+            if confirmed {
+                self?.reloadNoteFromDisk(note)
+            }
         }
     }
 
@@ -387,32 +382,29 @@ extension ViewController {
                 return
             }
 
-            let confirmAlert = NSAlert()
-            confirmAlert.messageText = I18n.str("Clean Orphan Attachments")
-            confirmAlert.informativeText = String(format: I18n.str("Detected %d unused attachment(s). Move them to Trash?"), orphanAttachments.count)
-            confirmAlert.addButton(withTitle: I18n.str("Clean"))
-            confirmAlert.addButton(withTitle: I18n.str("Cancel"))
-            confirmAlert.alertStyle = .warning
+            MiaoYanAlert.confirm(
+                message: I18n.str("Clean Orphan Attachments"),
+                informativeText: String(format: I18n.str("Detected %d unused attachment(s). Move them to Trash?"), orphanAttachments.count),
+                confirmTitle: I18n.str("Clean"),
+                for: vc.view.window
+            ) { confirmed in
+                guard confirmed else { return }
 
-            let response = confirmAlert.runModal()
-            guard response == .alertFirstButtonReturn else {
-                return
-            }
+                let result = self.storage.removeAttachments(urls: orphanAttachments)
 
-            let result = self.storage.removeAttachments(urls: orphanAttachments)
+                if !result.removed.isEmpty {
+                    NSSound(named: "Pop")?.play()
+                    vc.toast(message: String(format: I18n.str("Removed %d unused attachment(s)"), result.removed.count), style: .success)
+                }
 
-            if !result.removed.isEmpty {
-                NSSound(named: "Pop")?.play()
-                vc.toast(message: String(format: I18n.str("Removed %d unused attachment(s)"), result.removed.count), style: .success)
-            }
-
-            if !result.failed.isEmpty {
-                let failureAlert = NSAlert()
-                failureAlert.messageText = I18n.str("Some attachments could not be removed")
-                failureAlert.informativeText = I18n.str("Please try again")
-                failureAlert.addButton(withTitle: I18n.str("OK"))
-                failureAlert.alertStyle = .warning
-                failureAlert.runModal()
+                if !result.failed.isEmpty {
+                    MiaoYanAlert.show(
+                        message: I18n.str("Some attachments could not be removed"),
+                        informativeText: I18n.str("Please try again"),
+                        style: .warning,
+                        for: vc.view.window
+                    )
+                }
             }
         }
     }
@@ -864,16 +856,13 @@ extension ViewController {
         guard let notes = vc.notesTableView.getSelectedNotes() else { return }
         guard let window = MainWindowController.shared() else { return }
 
-        vc.alert = NSAlert()
-        guard let alert = vc.alert else { return }
-
-        alert.messageText = String(format: I18n.str("Are you sure you want to move %d note(s) to the system Trash?"), notes.count)
-
-        alert.informativeText = I18n.str("The note(s) will be moved to the system Trash and can be recovered.")
-        alert.addButton(withTitle: I18n.str("Move to Trash"))
-        alert.addButton(withTitle: I18n.str("Cancel"))
-        alert.beginSheetModal(for: window) { (returnCode: NSApplication.ModalResponse) in
-            if returnCode == NSApplication.ModalResponse.alertFirstButtonReturn {
+        MiaoYanAlert.confirm(
+            message: String(format: I18n.str("Are you sure you want to move %d note(s) to the system Trash?"), notes.count),
+            informativeText: I18n.str("The note(s) will be moved to the system Trash and can be recovered."),
+            confirmTitle: I18n.str("Move to Trash"),
+            for: window
+        ) { confirmed in
+            if confirmed {
                 let selectedRow = vc.notesTableView.selectedRowIndexes.min()
                 vc.editArea.clear()
                 vc.storage.removeNotes(notes: notes) { _ in
@@ -889,8 +878,6 @@ extension ViewController {
                         }
                     }
                 }
-            } else {
-                self.alert = nil
             }
         }
     }
