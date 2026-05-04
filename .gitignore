@@ -55,8 +55,8 @@ Thumbs.db
 *.swo
 ~*
 
-# Claude AI development guide (local only)
-CLAUDE.md
+# Local Claude Code overrides
+CLAUDE.local.md
 
 # ====================
 # Node.js & Web Development
@@ -88,8 +88,8 @@ package-lock.json
 # Project Specific
 # ====================
 # Release & Distribution
-Releases/
-Release/
+/Releases/
+/Release/
 /dist/
 *.ipa
 appcast.xml
@@ -103,11 +103,11 @@ Resources/DownView.bundle/demo.html
 IrEditor/
 fonts/
 
-.claude/
-.agents/
+# Shared agent instructions and repo-local skills are intentionally tracked.
+AGENTS.override.md
+CLAUDE.local.md
+.claude/settings.local.json
+.agents/settings.local.json
 
-AGENTS.md
-agents.md
-
-# AI Assistant files
+# Local AI Assistant files
 journal/
