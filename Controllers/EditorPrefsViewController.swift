@@ -6,60 +6,11 @@ final class EditorPrefsViewController: BasePrefsViewController {
     private var settingsStackView: NSStackView!
 
     override func setupUI() {
-        let scrollView = NSScrollView()
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = false
-        scrollView.borderType = .noBorder
-        scrollView.drawsBackground = false
-        scrollView.backgroundColor = .clear
-
-        // Ensure the clip view (contentView) is also transparent
-        scrollView.contentView.drawsBackground = false
-        scrollView.contentView.wantsLayer = true
-        scrollView.contentView.layer?.backgroundColor = NSColor.clear.cgColor
-
-        view.addSubview(scrollView)
-
-        let contentView = NSView()
-        contentView.translatesAutoresizingMaskIntoConstraints = false
-        contentView.wantsLayer = true
-        contentView.layer?.backgroundColor = NSColor.clear.cgColor
-        scrollView.documentView = contentView
-
-        setupEditorSettingsSection(in: contentView)
-
-        NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: view.topAnchor, constant: 20),
-            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -20),
-
-            contentView.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
-            contentView.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
-            contentView.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
-            contentView.bottomAnchor.constraint(equalTo: scrollView.contentView.bottomAnchor),
-            contentView.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor),
-        ])
+        setupEditorSettingsSection(in: installPreferencesStack())
     }
 
-    private func setupEditorSettingsSection(in parentView: NSView) {
-        let (sectionView, _) = createSectionView(
-            in: parentView,
-            topAnchor: parentView.topAnchor,
-            topConstant: 0
-        )
-
-        let rowSpacing: CGFloat = 16
-        let topSpacing: CGFloat = rowSpacing
-        let horizontalInset: CGFloat = 24
-
-        settingsStackView = NSStackView()
-        settingsStackView.translatesAutoresizingMaskIntoConstraints = false
-        settingsStackView.orientation = .vertical
-        settingsStackView.spacing = rowSpacing
-        settingsStackView.alignment = .leading
-        sectionView.addSubview(settingsStackView)
+    private func setupEditorSettingsSection(in stackView: NSStackView) {
+        settingsStackView = stackView
 
         let lineBreakRow = createSettingRow(
             label: I18n.str("Line Break:"),
@@ -90,14 +41,6 @@ final class EditorPrefsViewController: BasePrefsViewController {
             action: #selector(previewWidthChanged(_:))
         )
         settingsStackView.addArrangedSubview(widthRow)
-
-        NSLayoutConstraint.activate([
-            settingsStackView.topAnchor.constraint(equalTo: sectionView.topAnchor, constant: topSpacing),
-            settingsStackView.leadingAnchor.constraint(equalTo: sectionView.leadingAnchor, constant: horizontalInset),
-            settingsStackView.trailingAnchor.constraint(lessThanOrEqualTo: sectionView.trailingAnchor, constant: -horizontalInset),
-            settingsStackView.bottomAnchor.constraint(equalTo: sectionView.bottomAnchor, constant: -16),
-            sectionView.bottomAnchor.constraint(equalTo: parentView.bottomAnchor, constant: -20),
-        ])
     }
 
     private func createSectionView(in parentView: NSView, topAnchor: NSLayoutAnchor<NSLayoutYAxisAnchor>, topConstant: CGFloat, title: String? = nil) -> (container: NSView, titleLabel: NSTextField?) {
@@ -135,13 +78,6 @@ final class EditorPrefsViewController: BasePrefsViewController {
     }
 
     private func createSettingRow(label: String, options: [String], action: Selector) -> NSView {
-        let rowView = NSView()
-        rowView.translatesAutoresizingMaskIntoConstraints = false
-
-        let label = NSTextField(labelWithString: label)
-        label.translatesAutoresizingMaskIntoConstraints = false
-        label.alignment = .left
-
         let popUp = NSPopUpButton()
         popUp.translatesAutoresizingMaskIntoConstraints = false
         popUp.target = self
@@ -151,23 +87,7 @@ final class EditorPrefsViewController: BasePrefsViewController {
             popUp.addItem(withTitle: option)
         }
 
-        rowView.addSubview(label)
-        rowView.addSubview(popUp)
-
-        NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: rowView.leadingAnchor),
-            label.centerYAnchor.constraint(equalTo: rowView.centerYAnchor),
-            label.widthAnchor.constraint(equalToConstant: 140),
-
-            popUp.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 16),
-            popUp.centerYAnchor.constraint(equalTo: rowView.centerYAnchor),
-            popUp.widthAnchor.constraint(greaterThanOrEqualToConstant: 120),
-
-            rowView.heightAnchor.constraint(equalToConstant: 24),
-            rowView.trailingAnchor.constraint(greaterThanOrEqualTo: popUp.trailingAnchor),
-        ])
-
-        return rowView
+        return makePreferencesRow(labelText: label, control: popUp)
     }
 
     override func setupValues() {
@@ -277,19 +197,4 @@ final class EditorPrefsViewController: BasePrefsViewController {
         return display
     }
 
-    private func showRestartAlert() {
-        guard let window = view.window else { return }
-        let alert = NSAlert()
-        alert.messageText = I18n.str("Restart to MiaoYan to take effect")
-        alert.addButton(withTitle: I18n.str("Confirm"))
-        alert.addButton(withTitle: I18n.str("Cancel"))
-        alert.beginSheetModal(for: window) { response in
-            if response == .alertFirstButtonReturn {
-                UserDefaultsManagement.isFirstLaunch = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    AppDelegate.relaunchApp()
-                }
-            }
-        }
-    }
 }

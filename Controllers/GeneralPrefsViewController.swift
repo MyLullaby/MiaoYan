@@ -1,40 +1,6 @@
 import Cocoa
 import KeyboardShortcuts
 
-private final class AppearanceAwareSeparatorView: NSView {
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        commonInit()
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        updateColor()
-    }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        updateColor()
-    }
-
-    private func commonInit() {
-        translatesAutoresizingMaskIntoConstraints = false
-        wantsLayer = true
-        layer?.cornerRadius = 0.5
-        updateColor()
-    }
-
-    private func updateColor() {
-        let appearance = window?.effectiveAppearance ?? effectiveAppearance
-        layer?.backgroundColor = Theme.dividerColor.resolvedColor(for: appearance).cgColor
-    }
-}
-
 @MainActor
 final class GeneralPrefsViewController: BasePrefsViewController {
     private var settings = GeneralSettings()
@@ -43,13 +9,12 @@ final class GeneralPrefsViewController: BasePrefsViewController {
     private var languagePopUp: NSPopUpButton!
     private var storagePathControl: NSPathControl!
     private var storageChangeButton: NSButton!
-    private var buttonShowPopUp: NSPopUpButton!
-    private var alwaysOnTopPopUp: NSPopUpButton!
+    private var buttonShowSegmented: PrefsSegmentedControl!
+    private var alwaysOnTopCheckbox: NSButton!
     private var activateShortcutRecorder: ThemeAwareShortcutRecorderView!
 
     // Editor settings controls
-    // Editor settings controls
-    private var editorModePopUp: NSPopUpButton!
+    private var editorModeSegmented: PrefsSegmentedControl!
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -62,73 +27,22 @@ final class GeneralPrefsViewController: BasePrefsViewController {
     }
 
     @objc private func handleSplitViewModeChanged() {
-        guard let editorModePopUp = editorModePopUp else { return }
-        editorModePopUp.selectItem(withTitle: localizedEditorMode(UserDefaultsManagement.splitViewMode))
+        guard let editorModeSegmented = editorModeSegmented else { return }
+        editorModeSegmented.selectedSegment = UserDefaultsManagement.splitViewMode ? 1 : 0
     }
 
     @objc private func handleAlwaysOnTopChanged() {
-        guard let alwaysOnTopPopUp = alwaysOnTopPopUp else { return }
-        alwaysOnTopPopUp.selectItem(withTag: UserDefaultsManagement.alwaysOnTop ? 1 : 0)
+        guard let alwaysOnTopCheckbox = alwaysOnTopCheckbox else { return }
+        alwaysOnTopCheckbox.state = UserDefaultsManagement.alwaysOnTop ? .on : .off
     }
 
     override func setupUI() {
-        let scrollView = NSScrollView()
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = false
-        scrollView.borderType = .noBorder
-        scrollView.drawsBackground = false
-        scrollView.backgroundColor = .clear
-
-        // Ensure the clip view (contentView) is also transparent
-        scrollView.contentView.drawsBackground = false
-        scrollView.contentView.wantsLayer = true
-        scrollView.contentView.layer?.backgroundColor = NSColor.clear.cgColor
-
-        view.addSubview(scrollView)
-
-        let contentView = NSView()
-        contentView.translatesAutoresizingMaskIntoConstraints = false
-        contentView.wantsLayer = true
-        contentView.layer?.backgroundColor = NSColor.clear.cgColor
-        scrollView.documentView = contentView
-
-        setupAppearanceSection(in: contentView)
-        NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: view.topAnchor, constant: 20),
-            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -20),
-
-            contentView.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
-            contentView.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
-            contentView.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
-            contentView.bottomAnchor.constraint(equalTo: scrollView.contentView.bottomAnchor),
-            contentView.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor),
-        ])
+        setupAppearanceSection(in: installPreferencesStack())
     }
 
-    private func setupAppearanceSection(in parentView: NSView) {
-        let (sectionView, _) = createSectionView(
-            in: parentView,
-            topAnchor: parentView.topAnchor,
-            topConstant: 0
-        )
-
-        let rowSpacing: CGFloat = 16
-        let topSpacing: CGFloat = rowSpacing
-        let horizontalInset: CGFloat = 24
-        let controlWidth: CGFloat = 200
-
-        let stackView = NSStackView()
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        stackView.orientation = .vertical
-        stackView.spacing = rowSpacing
-        stackView.alignment = .leading
-        sectionView.addSubview(stackView)
-
-        let storageRow = createStorageRow(controlWidth: controlWidth)
-        let storageSeparator = createSeparatorView()
+    private func setupAppearanceSection(in stackView: NSStackView) {
+        let storageRow = createStorageRow()
+        let storageSeparator = makePreferencesSeparator()
 
         appearancePopUp = NSPopUpButton()
         appearancePopUp.translatesAutoresizingMaskIntoConstraints = false
@@ -139,13 +53,10 @@ final class GeneralPrefsViewController: BasePrefsViewController {
         appearancePopUp.addItem(withTitle: I18n.str("Light"))
         appearancePopUp.addItem(withTitle: I18n.str("Dark"))
 
-        buttonShowPopUp = NSPopUpButton()
-        buttonShowPopUp.translatesAutoresizingMaskIntoConstraints = false
-        buttonShowPopUp.target = self
-        buttonShowPopUp.action = #selector(buttonShowChanged(_:))
-
-        buttonShowPopUp.addItem(withTitle: I18n.str("Always"))
-        buttonShowPopUp.addItem(withTitle: I18n.str("On Hover"))
+        buttonShowSegmented = makeSegmentedControl(
+            labels: [I18n.str("Always"), I18n.str("On Hover")],
+            action: #selector(buttonShowChanged(_:))
+        )
 
         languagePopUp = NSPopUpButton()
         languagePopUp.translatesAutoresizingMaskIntoConstraints = false
@@ -164,36 +75,23 @@ final class GeneralPrefsViewController: BasePrefsViewController {
             }
         }
 
-        alwaysOnTopPopUp = NSPopUpButton()
-        alwaysOnTopPopUp.translatesAutoresizingMaskIntoConstraints = false
-        alwaysOnTopPopUp.target = self
-        alwaysOnTopPopUp.action = #selector(alwaysOnTopChanged(_:))
-
-        let noItem = NSMenuItem(title: I18n.str("No"), action: nil, keyEquivalent: "")
-        noItem.tag = 0
-        alwaysOnTopPopUp.menu?.addItem(noItem)
-
-        let yesItem = NSMenuItem(title: I18n.str("Yes"), action: nil, keyEquivalent: "")
-        yesItem.tag = 1
-        alwaysOnTopPopUp.menu?.addItem(yesItem)
+        alwaysOnTopCheckbox = NSButton(checkboxWithTitle: "", target: self, action: #selector(alwaysOnTopChanged(_:)))
+        alwaysOnTopCheckbox.translatesAutoresizingMaskIntoConstraints = false
 
         activateShortcutRecorder = ThemeAwareShortcutRecorderView(for: .activateWindow)
         activateShortcutRecorder.translatesAutoresizingMaskIntoConstraints = false
-        let appearanceRow = createPreferencesRow(labelText: I18n.str("Appearance:"), control: appearancePopUp, controlWidth: controlWidth)
-        let languageRow = createPreferencesRow(labelText: I18n.str("Language:"), control: languagePopUp, controlWidth: controlWidth)
-        let buttonRow = createPreferencesRow(labelText: I18n.str("Button Display:"), control: buttonShowPopUp, controlWidth: controlWidth)
-        let alwaysRow = createPreferencesRow(labelText: I18n.str("Always On Top:"), control: alwaysOnTopPopUp, controlWidth: controlWidth)
-        let shortcutRow = createPreferencesRow(labelText: I18n.str("Activate Shortcut:"), control: activateShortcutRecorder, controlWidth: controlWidth)
+        let appearanceRow = makePreferencesRow(labelText: I18n.str("Appearance:"), control: appearancePopUp)
+        let languageRow = makePreferencesRow(labelText: I18n.str("Language:"), control: languagePopUp)
+        let buttonRow = makePreferencesRow(labelText: I18n.str("Button Display:"), control: buttonShowSegmented)
+        let alwaysRow = makePreferencesRow(labelText: I18n.str("Always On Top:"), control: alwaysOnTopCheckbox, controlWidth: nil)
+        let shortcutRow = makePreferencesRow(labelText: I18n.str("Activate Shortcut:"), control: activateShortcutRecorder)
 
-        // Editor settings
-        editorModePopUp = NSPopUpButton()
-        editorModePopUp.translatesAutoresizingMaskIntoConstraints = false
-        editorModePopUp.target = self
-        editorModePopUp.action = #selector(editorModeChanged(_:))
-        editorModePopUp.addItem(withTitle: localizedEditorMode(false))
-        editorModePopUp.addItem(withTitle: localizedEditorMode(true))
+        editorModeSegmented = makeSegmentedControl(
+            labels: [localizedEditorMode(false), localizedEditorMode(true)],
+            action: #selector(editorModeChanged(_:))
+        )
 
-        let editorModeRow = createPreferencesRow(labelText: I18n.str("Editor Mode:"), control: editorModePopUp, controlWidth: controlWidth)
+        let editorModeRow = makePreferencesRow(labelText: I18n.str("Editor Mode:"), control: editorModeSegmented)
 
         [
             storageRow,
@@ -205,143 +103,22 @@ final class GeneralPrefsViewController: BasePrefsViewController {
             alwaysRow,
             shortcutRow,
         ].forEach { stackView.addArrangedSubview($0) }
-        stackView.setCustomSpacing(rowSpacing * 1.5, after: storageSeparator)
-
-        NSLayoutConstraint.activate([
-            stackView.topAnchor.constraint(equalTo: sectionView.topAnchor, constant: topSpacing),
-            stackView.leadingAnchor.constraint(equalTo: sectionView.leadingAnchor, constant: horizontalInset),
-            stackView.trailingAnchor.constraint(lessThanOrEqualTo: sectionView.trailingAnchor, constant: -horizontalInset),
-            stackView.bottomAnchor.constraint(equalTo: sectionView.bottomAnchor, constant: -rowSpacing),
-        ])
+        stackView.setCustomSpacing(PrefsFormMetrics.groupSpacing, after: storageSeparator)
     }
 
-    private func createSectionView(in parentView: NSView, topAnchor: NSLayoutAnchor<NSLayoutYAxisAnchor>, topConstant: CGFloat, title: String? = nil) -> (container: NSView, titleLabel: NSTextField?) {
-        let containerView = NSView()
-        containerView.translatesAutoresizingMaskIntoConstraints = false
-        containerView.wantsLayer = true
-        containerView.layer?.backgroundColor = NSColor.clear.cgColor
-
-        var titleLabel: NSTextField?
-        if let title = title {
-            let label = NSTextField(labelWithString: title)
-            label.translatesAutoresizingMaskIntoConstraints = false
-            label.font = NSFont.boldSystemFont(ofSize: 13)
-            label.textColor = Theme.textColor
-            containerView.addSubview(label)
-            titleLabel = label
-        }
-
-        parentView.addSubview(containerView)
-
-        NSLayoutConstraint.activate([
-            containerView.topAnchor.constraint(equalTo: topAnchor, constant: topConstant),
-            containerView.leadingAnchor.constraint(equalTo: parentView.leadingAnchor),
-            containerView.trailingAnchor.constraint(equalTo: parentView.trailingAnchor),
-        ])
-
-        if let titleLabel {
-            NSLayoutConstraint.activate([
-                titleLabel.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 12),
-                titleLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
-            ])
-        }
-
-        return (containerView, titleLabel)
-    }
-
-    private func createPreferencesRow(labelText: String, control: NSView, controlWidth: CGFloat? = nil) -> NSView {
-        let rowView = NSView()
-        rowView.translatesAutoresizingMaskIntoConstraints = false
-
-        let label = NSTextField(labelWithString: labelText)
-        label.translatesAutoresizingMaskIntoConstraints = false
-        label.alignment = .left
-
-        control.translatesAutoresizingMaskIntoConstraints = false
-
-        rowView.addSubview(label)
-        rowView.addSubview(control)
-
-        let spacing: CGFloat = 16
-
-        NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: rowView.leadingAnchor),
-            label.centerYAnchor.constraint(equalTo: rowView.centerYAnchor),
-            label.widthAnchor.constraint(equalToConstant: 140),
-
-            control.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: spacing),
-            control.centerYAnchor.constraint(equalTo: rowView.centerYAnchor),
-            rowView.trailingAnchor.constraint(equalTo: control.trailingAnchor),
-        ])
-
-        if let controlWidth {
-            control.widthAnchor.constraint(equalToConstant: controlWidth).isActive = true
-        }
-
-        rowView.heightAnchor.constraint(greaterThanOrEqualToConstant: 24).isActive = true
-
-        return rowView
-    }
-
-    private func createSeparatorView() -> NSView {
-        let container = NSView()
-        container.translatesAutoresizingMaskIntoConstraints = false
-        container.heightAnchor.constraint(equalToConstant: 1).isActive = true
-
-        let line = AppearanceAwareSeparatorView()
-        container.addSubview(line)
-
-        NSLayoutConstraint.activate([
-            line.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            line.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            line.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-            line.heightAnchor.constraint(equalToConstant: 1),
-        ])
-
-        container.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        container.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-
-        return container
-    }
-
-    private func createStorageRow(controlWidth: CGFloat) -> NSView {
-        let rowView = NSView()
-        rowView.translatesAutoresizingMaskIntoConstraints = false
-
-        let label = NSTextField(labelWithString: "\(I18n.str("Note Location")):")
-        label.translatesAutoresizingMaskIntoConstraints = false
-        label.alignment = .left
-
+    private func createStorageRow() -> NSView {
         storagePathControl = NSPathControl()
         storagePathControl.translatesAutoresizingMaskIntoConstraints = false
         storagePathControl.pathStyle = .standard
         storagePathControl.lineBreakMode = .byTruncatingMiddle
+        storagePathControl.widthAnchor.constraint(equalToConstant: 270).isActive = true
 
         storageChangeButton = NSButton(title: I18n.str("Change"), target: self, action: #selector(changeStorageLocation(_:)))
         storageChangeButton.translatesAutoresizingMaskIntoConstraints = false
+        storageChangeButton.widthAnchor.constraint(equalToConstant: 82).isActive = true
 
-        rowView.addSubview(label)
-        rowView.addSubview(storagePathControl)
-        rowView.addSubview(storageChangeButton)
-
-        NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: rowView.leadingAnchor),
-            label.centerYAnchor.constraint(equalTo: rowView.centerYAnchor),
-            label.widthAnchor.constraint(equalToConstant: 140),
-
-            storagePathControl.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 16),
-            storagePathControl.centerYAnchor.constraint(equalTo: rowView.centerYAnchor),
-            storagePathControl.widthAnchor.constraint(greaterThanOrEqualToConstant: controlWidth),
-
-            storageChangeButton.leadingAnchor.constraint(equalTo: storagePathControl.trailingAnchor, constant: 12),
-            storageChangeButton.trailingAnchor.constraint(equalTo: rowView.trailingAnchor),
-            storageChangeButton.centerYAnchor.constraint(equalTo: rowView.centerYAnchor),
-            storageChangeButton.widthAnchor.constraint(equalToConstant: 80),
-        ])
-
-        rowView.heightAnchor.constraint(greaterThanOrEqualToConstant: 28).isActive = true
-
-        return rowView
+        let controls = makeControlStack([storagePathControl, storageChangeButton], spacing: 12)
+        return makePreferencesRow(labelText: "\(I18n.str("Note Location")):", control: controls, controlWidth: nil)
     }
 
     override func setupValues() {
@@ -353,11 +130,11 @@ final class GeneralPrefsViewController: BasePrefsViewController {
             storagePathControl.url = URL(fileURLWithPath: storagePath)
         }
 
-        buttonShowPopUp.selectItem(withTitle: localizedButtonShow(settings.buttonShow))
-        alwaysOnTopPopUp.selectItem(withTag: UserDefaultsManagement.alwaysOnTop ? 1 : 0)
+        buttonShowSegmented.selectedSegment = rawButtonShow(from: localizedButtonShow(settings.buttonShow)) == "Hover" ? 1 : 0
+        alwaysOnTopCheckbox.state = UserDefaultsManagement.alwaysOnTop ? .on : .off
 
         // Editor settings values
-        editorModePopUp.selectItem(withTitle: localizedEditorMode(UserDefaultsManagement.splitViewMode))
+        editorModeSegmented.selectedSegment = UserDefaultsManagement.splitViewMode ? 1 : 0
 
     }
 
@@ -417,7 +194,7 @@ final class GeneralPrefsViewController: BasePrefsViewController {
         openPanel.canCreateDirectories = true
         openPanel.canChooseFiles = false
 
-        openPanel.begin { result in
+        let handleResult: (NSApplication.ModalResponse) -> Void = { result in
             if result == .OK, let url = openPanel.url {
                 // Save old values for rollback if user cancels restart
                 let oldPath = self.settings.storagePath
@@ -450,18 +227,24 @@ final class GeneralPrefsViewController: BasePrefsViewController {
                 }
             }
         }
+
+        if let window = view.window {
+            openPanel.beginSheetModal(for: window, completionHandler: handleResult)
+        } else {
+            openPanel.begin(completionHandler: handleResult)
+        }
     }
 
-    @objc private func buttonShowChanged(_ sender: NSPopUpButton) {
-        guard let title = sender.selectedItem?.title else { return }
+    @objc private func buttonShowChanged(_ sender: PrefsSegmentedControl) {
+        let title = sender.label(forSegment: sender.selectedSegment) ?? I18n.str("Always")
         settings.buttonShow = rawButtonShow(from: title)
         if let vc = ViewController.shared() {
             vc.applyButtonVisibilityPreference()
         }
     }
 
-    @objc private func alwaysOnTopChanged(_ sender: NSPopUpButton) {
-        let enabled = sender.selectedTag() == 1
+    @objc private func alwaysOnTopChanged(_ sender: NSButton) {
+        let enabled = sender.state == .on
         UserDefaultsManagement.alwaysOnTop = enabled
         NotificationCenter.default.post(name: .alwaysOnTopChanged, object: nil)
     }
@@ -484,36 +267,10 @@ final class GeneralPrefsViewController: BasePrefsViewController {
         return display
     }
 
-    private func showRestartAlert(completion: ((Bool) -> Void)? = nil) {
-        guard let window = view.window else {
-            completion?(false)
-            return
-        }
-        let alert = NSAlert()
-        alert.messageText = I18n.str("Restart to MiaoYan to take effect")
-        alert.addButton(withTitle: I18n.str("Confirm"))
-        alert.addButton(withTitle: I18n.str("Cancel"))
-        alert.beginSheetModal(for: window) { response in
-            if response == .alertFirstButtonReturn {
-                completion?(true)
-                UserDefaultsManagement.isFirstLaunch = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    AppDelegate.relaunchApp()
-                }
-            } else {
-                completion?(false)
-            }
-        }
-    }
-
     // MARK: - Editor Settings Actions
 
-    @objc private func editorModeChanged(_ sender: NSPopUpButton) {
-        guard let item = sender.selectedItem,
-            let isSplit = rawEditorMode(from: item.title)
-        else {
-            return
-        }
+    @objc private func editorModeChanged(_ sender: PrefsSegmentedControl) {
+        let isSplit = sender.selectedSegment == 1
         if let vc = ViewController.shared() {
             vc.sessionSplitMode = isSplit
             vc.applyEditorModePreferenceChange()
@@ -530,15 +287,6 @@ final class GeneralPrefsViewController: BasePrefsViewController {
         }
     }
 
-    private func rawEditorMode(from display: String) -> Bool? {
-        if display == localizedEditorMode(false) {
-            return false
-        }
-        if display == localizedEditorMode(true) {
-            return true
-        }
-        return nil
-    }
 }
 
 private final class ThemeAwareShortcutRecorderView: NSView {
@@ -649,7 +397,7 @@ private final class ThemeAwareShortcutRecorderView: NSView {
     private func updateAppearance() {
         guard let layer else { return }
         let appearance = window?.effectiveAppearance ?? effectiveAppearance
-        let backgroundColor = Theme.backgroundColor.resolvedColor(for: appearance)
+        let backgroundColor = Theme.settingsContentBackgroundColor.resolvedColor(for: appearance)
         let borderColor: NSColor
 
         if isRecording {

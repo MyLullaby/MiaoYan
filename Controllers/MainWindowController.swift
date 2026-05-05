@@ -70,6 +70,7 @@ class MainWindowController: NSWindowController, NSWindowDelegate, NSWindowRestor
         if let vc = AppContext.shared.viewController {
             vc.editArea.applySystemAppearance()
             vc.editArea.markdownView?.updateAppearance()
+            vc.applyModernChromeStyling()
             vc.updateToolbarButtonTints()
 
             // Save current selection before refreshing rows
@@ -229,17 +230,17 @@ class MainWindowController: NSWindowController, NSWindowDelegate, NSWindowRestor
             switch UserDefaultsManagement.appearanceType {
             case .Light:
                 targetAppearance = NSAppearance(named: .aqua)
-                backgroundColor = Theme.backgroundColor
+                backgroundColor = Theme.windowChromeBackgroundColor
             case .Dark:
                 targetAppearance = NSAppearance(named: .darkAqua)
-                backgroundColor = Theme.backgroundColor
+                backgroundColor = Theme.windowChromeBackgroundColor
             case .System:
                 // In System mode, set appearance to nil to follow system
                 targetAppearance = nil
-                backgroundColor = Theme.backgroundColor
+                backgroundColor = Theme.windowChromeBackgroundColor
             default:
                 targetAppearance = nil
-                backgroundColor = Theme.backgroundColor
+                backgroundColor = Theme.windowChromeBackgroundColor
             }
         } else {
             targetAppearance = nil
@@ -255,6 +256,8 @@ class MainWindowController: NSWindowController, NSWindowDelegate, NSWindowRestor
             window.appearance = targetAppearance
             window.contentView?.appearance = targetAppearance
         }
+
+        window.isOpaque = !Theme.usesModernSystemChrome
 
         // Background
         if window.backgroundColor != backgroundColor {

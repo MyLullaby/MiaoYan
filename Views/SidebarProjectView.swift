@@ -4,8 +4,8 @@ import Foundation
 
 @MainActor
 private enum UIConstants {
-    static let allItemRowHeight: CGFloat = 48
-    static let defaultRowHeight: CGFloat = 34
+    static let allItemRowHeight: CGFloat = 40
+    static let defaultRowHeight: CGFloat = 32
 }
 
 @MainActor
@@ -492,9 +492,9 @@ class SidebarProjectView: NSOutlineView,
     }
 
     private func configureForSidebarItemType(_ cell: SidebarCellView, sidebarItem: SidebarItem, baseFont: NSFont, accentColor: NSColor) {
-        let accentIconSize: CGFloat = 24
-        let accentSpacing: CGFloat = 4
-        let accentIconLeading: CGFloat = -2
+        let accentIconSize: CGFloat = Theme.usesModernSystemChrome ? 20 : 24
+        let accentSpacing: CGFloat = Theme.usesModernSystemChrome ? 6 : 4
+        let accentIconLeading: CGFloat = Theme.usesModernSystemChrome ? 2 : -2
         let accentFont = createAccentFont(from: baseFont)
 
         switch sidebarItem.type {
@@ -536,7 +536,7 @@ class SidebarProjectView: NSOutlineView,
                 NSFontDescriptor.TraitKey.weight: NSNumber(value: Double(NSFont.Weight.semibold.rawValue))
             ]
         ])
-        let accentFontSize = baseFont.pointSize + 2
+        let accentFontSize = baseFont.pointSize + (Theme.usesModernSystemChrome ? 1 : 2)
         return NSFont(
             descriptor: accentFontDescriptor,
             size: accentFontSize
@@ -890,16 +890,16 @@ class SidebarProjectView: NSOutlineView,
                 return
             }
 
-            let alert = NSAlert()
             let messageText = I18n.str("Are you sure you want to remove project \"%@\" and all files inside?")
 
-            alert.messageText = String(format: messageText, project.label)
-            alert.informativeText = I18n.str("This action cannot be undone.")
-            alert.addButton(withTitle: I18n.str("Remove"))
-            alert.addButton(withTitle: I18n.str("Cancel"))
-            alert.beginSheetModal(for: w) { [weak vc, weak v] (returnCode: NSApplication.ModalResponse) in
+            MiaoYanAlert.confirm(
+                message: String(format: messageText, project.label),
+                informativeText: I18n.str("This action cannot be undone."),
+                confirmTitle: I18n.str("Remove"),
+                for: w
+            ) { [weak vc, weak v] confirmed in
                 guard let vc = vc, let v = v else { return }
-                if returnCode == NSApplication.ModalResponse.alertFirstButtonReturn {
+                if confirmed {
                     guard let resultingItemUrl = Storage.sharedInstance().trashItem(url: project.url) else {
                         return
                     }
@@ -939,21 +939,25 @@ class SidebarProjectView: NSOutlineView,
             return
         }
 
-        let alert = NSAlert()
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 26))
         field.focusRingType = .none
-        alert.messageText = I18n.str("New project")
+        field.placeholderString = I18n.str("Project name")
+        let alert = MiaoYanAlert.make(
+            message: I18n.str("New project"),
+            style: .informational,
+            buttons: [I18n.str("Add"), I18n.str("Cancel")]
+        )
         alert.accessoryView = field
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: I18n.str("Add"))
-        alert.addButton(withTitle: I18n.str("Cancel"))
+        alert.window.initialFirstResponder = field
         alert.beginSheetModal(for: window) { [weak self] (returnCode: NSApplication.ModalResponse) in
             if returnCode == NSApplication.ModalResponse.alertFirstButtonReturn {
                 self?.addChild(field: field, project: parentProject)
             }
         }
 
-        field.becomeFirstResponder()
+        DispatchQueue.main.async {
+            field.becomeFirstResponder()
+        }
     }
 
     @IBAction func openSettings(_ sender: NSMenuItem) {
@@ -1009,9 +1013,11 @@ class SidebarProjectView: NSOutlineView,
             }
 
         } catch {
-            let alert = NSAlert()
-            alert.messageText = error.localizedDescription
-            alert.runModal()
+            MiaoYanAlert.show(
+                message: error.localizedDescription,
+                style: .warning,
+                for: window
+            )
         }
     }
 

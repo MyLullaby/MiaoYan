@@ -23,22 +23,25 @@
 
 ## 特点
 
-- **妙**：纯本地使用、不收集任何数据、语法高亮、分栏编辑预览、PPT 演示、LaTeX、Mermaid 图表
-- **美**：极简设计风格、三栏模式、深色模式、专注写作
+- **妙**：纯本地使用、不收集任何数据、语法高亮、分栏编辑预览、Wikilink 双向链接、PPT 演示、LaTeX、Mermaid 图表
+- **美**：极简设计风格、三栏模式、深色模式、macOS 26 玻璃质感、专注写作
 - **快**：Swift 6 原生开发、相比 Web 套壳性能体验更好
-- **简**：轻量纯粹、众多快捷键、自动排版
+- **简**：轻量纯粹、版本历史、众多快捷键、自动排版
 
 ## 安装使用
 
-从 **Mac App Store** 下载，后续所有更新都会在那里发布。付费下载是支持持续维护和后续多端同步最直接的方式，开源版本使用体验完全一致。
+1. **Mac App Store**(付费,自动更新):
 
-<a href="https://apps.apple.com/cn/app/miaoyan/id6759252269"><img src="https://cdn.tw93.fun/uPic/C3Renh.png" width="160" alt="Download on the Mac App Store" /></a>
+   <a href="https://apps.apple.com/cn/app/miaoyan/id6759252269"><img src="https://cdn.tw93.fun/uPic/C3Renh.png" width="160" alt="Download on the Mac App Store" /></a>
 
-安装后在 iCloud 云盘或其他位置创建 `MiaoYan` 文件夹，打开设置 (⌘,) 指定存储位置，就可以开始写了。任何赞助过或给妙言提交过代码的小伙伴，欢迎直接找我要兑换码。
+2. **Homebrew**:
+   ```bash
+   brew install --cask miaoyan
+   ```
 
-### 自行编译 / 历史版本
+3. **GitHub Releases**: 从 [GitHub Releases](https://github.com/tw93/MiaoYan/releases/latest) 下载最新 DMG(macOS 11.5+)
 
-从 **4.0** 开始妙言统一在 App Store 发布。你仍可以从开源代码自行编译，或在 [GitHub Releases](https://github.com/tw93/MiaoYan/releases) 下载 4.0 之前的 DMG。
+三种方式共享同一份代码,功能完全一致,同步更新。安装后在 iCloud 云盘或其他位置创建 `MiaoYan` 文件夹,打开设置 (⌘,) 指定存储位置,就可以开始写了。
 
 ## 命令行工具
 
@@ -75,7 +78,7 @@ miao update             # 更新 CLI
 
 ## 支持
 
-1. 我有两只猫：汤圆、可乐，若妙言让你开心，<a href="https://miaoyan.app/cats.html" target="_blank">请她们吃罐头 🥩</a>。
+1. 我有两只猫：汤圆、可乐，若妙言让你开心，<a href="https://cats.tw93.fun" target="_blank">请她们吃罐头 🥩</a>。
 2. 如果你喜欢妙言，欢迎给它一个 Star，更欢迎推荐给你志同道合的朋友使用。
 3. 可以关注我的 [Twitter](https://twitter.com/HiTw93) 获取最新的更新消息，也欢迎加入 [Telegram](https://t.me/+GclQS9ZnxyI2ODQ1) 聊天群。
 

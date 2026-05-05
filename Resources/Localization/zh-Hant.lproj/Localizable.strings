@@ -259,3 +259,8 @@
 "Restored to version from %@" = "已還原到 %@ 的版本";
 "No Version History" = "暫無歷史版本";
 "Versions are saved automatically every 5 minutes while editing" = "編輯時每 5 分鐘自動儲存一個版本";
+"Words" = "字數";
+"Modified" = "修改";
+"Created" = "建立";
+"Backlinks" = "反向連結";
+"Project name" = "資料夾名稱";

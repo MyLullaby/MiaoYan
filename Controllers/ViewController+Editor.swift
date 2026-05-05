@@ -528,8 +528,7 @@ extension ViewController {
 
         // Load content in presentation mode
         refillEditArea(previewOnly: true, force: true)
-        presentationButton.state = .on
-        presentationButton.contentTintColor = Theme.accentColor
+        updateToolbarButtonTints()
         // Disable editor's find bar to prevent Cmd+F from being intercepted by NSTextView
         editArea.usesFindBar = false
         // Hide editor scrollbar to prevent overlap with preview scrollbar
@@ -546,10 +545,9 @@ extension ViewController {
     }
 
     func disablePresentation() {
-        presentationButton.state = .off
-        presentationButton.contentTintColor = nil
         // Clear state immediately so guards in deleteNote etc. stop blocking
         sessionPresentationMode = false
+        updateToolbarButtonTints()
         if sessionFullScreenMode {
             sessionFullScreenMode = false
             view.window?.toggleFullScreen(nil)
@@ -565,10 +563,7 @@ extension ViewController {
     // MARK: - Helper Methods
     private func updateButtonStates() {
         DispatchQueue.main.async {
-            self.previewButton.state = self.sessionPreviewMode ? .on : .off
-            self.previewButton.contentTintColor = self.sessionPreviewMode ? Theme.accentColor : nil
-            self.presentationButton.state = self.sessionPresentationMode ? .on : .off
-            self.presentationButton.contentTintColor = self.sessionPresentationMode ? Theme.accentColor : nil
+            self.updateToolbarButtonTints()
         }
     }
 
@@ -626,10 +621,7 @@ extension ViewController {
         toggleListButton?.isHidden = true
         toggleSplitButton?.isHidden = true
         DispatchQueue.main.async { [self] in
-            previewButton.state = .on
-            previewButton.contentTintColor = Theme.accentColor
-            presentationButton.state = .on
-            presentationButton.contentTintColor = Theme.accentColor
+            updateToolbarButtonTints()
         }
         if !sessionFullScreenMode {
             view.window?.toggleFullScreen(nil)
@@ -692,10 +684,7 @@ extension ViewController {
 
         // Update button states
         DispatchQueue.main.async {
-            self.previewButton.state = .off
-            self.previewButton.contentTintColor = nil
-            self.presentationButton.state = .off
-            self.presentationButton.contentTintColor = nil
+            self.updateToolbarButtonTints()
         }
         // Restore title components that were hidden in PPT mode
         DispatchQueue.main.async {
@@ -1386,11 +1375,11 @@ extension ViewController {
     }
 
     private func showAlert(for title: String) {
-        let alert = NSAlert()
-        alert.alertStyle = .informational
-        alert.informativeText = String(format: I18n.str("This %@ under this folder already exists!"), title)
-        alert.messageText = I18n.str("Please change the title")
-        alert.runModal()
+        MiaoYanAlert.show(
+            message: I18n.str("Please change the title"),
+            informativeText: String(format: I18n.str("This %@ under this folder already exists!"), title),
+            for: view.window
+        )
     }
 
     private enum SaveResult {

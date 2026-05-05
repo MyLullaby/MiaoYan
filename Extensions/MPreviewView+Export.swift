@@ -344,16 +344,19 @@ extension MPreviewView {
             let note = vc.notesTableView.getSelectedNote()
         else { return }
 
-        vc.toastPersistent(message: "\(I18n.str("Exporting...")) 0%")
-
         // Reveal.js-backed PPT export stays on createPDF: slide pagination is provided by reveal,
         // and the snapshot API is exactly what captures each slide page.
         if UserDefaultsManagement.magicPPT || UserDefaultsManagement.isOnExportPPT {
+            vc.toastPersistent(message: "\(I18n.str("Exporting...")) 0%")
             exportPdfViaSnapshot(note: note, viewController: vc)
             return
         }
 
-        exportPdfViaPrintOperation(note: note, viewController: vc)
+        PdfExportPreviewController.present(note: note, from: vc) { [weak self, weak vc] in
+            guard let self, let vc else { return }
+            vc.toastPersistent(message: "\(I18n.str("Exporting...")) 0%")
+            self.exportPdfViaPrintOperation(note: note, viewController: vc)
+        }
     }
 
     private func exportPdfViaPrintOperation(note: Note, viewController vc: ViewController) {
@@ -361,6 +364,13 @@ extension MPreviewView {
         vc.toastUpdate(message: "\(I18n.str("Exporting...")) 20%")
 
         self.evaluateJavaScript("document.documentElement.outerHTML") { [weak self] html, _ in
+            guard let self else {
+                vc.toastDismiss()
+                vc.toastExport(status: false)
+                Self.isExporting = false
+                return
+            }
+
             let renderedHTML = (html as? String) ?? ""
             guard renderedHTML.count > 50 else {
                 vc.toastDismiss()
@@ -374,14 +384,13 @@ extension MPreviewView {
             let baseURL = HtmlManager.previewBundleURL()
             let controller = PdfExportController(note: note, html: renderedHTML, baseURL: baseURL, viewController: vc)
 
-            // Retain the controller for the duration of the export; release on completion.
-            objc_setAssociatedObject(self ?? NSObject(), &AssociatedKeys.pdfExportController, controller, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+            objc_setAssociatedObject(self, &AssociatedKeys.pdfExportController, controller, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
 
-            controller.run { success in
+            controller.run { [weak self] success in
                 vc.toastDismiss()
                 vc.toastExport(status: success)
                 Self.isExporting = false
-                if let self = self {
+                if let self {
                     objc_setAssociatedObject(self, &AssociatedKeys.pdfExportController, nil, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
                 }
             }
@@ -1114,6 +1123,43 @@ extension MPreviewView {
 
         if root.numberOfChildren == 0 { return pdfData }
         doc.outlineRoot = root
+        return doc.dataRepresentation() ?? pdfData
+    }
+
+    static func decoratePdfForExport(pdfData: Data, title: String) -> Data {
+        guard let doc = PDFDocument(data: pdfData), doc.pageCount > 0 else { return pdfData }
+
+        var attributes = doc.documentAttributes ?? [:]
+        attributes[PDFDocumentAttribute.titleAttribute] = title
+        attributes[PDFDocumentAttribute.creatorAttribute] = "MiaoYan"
+        doc.documentAttributes = attributes
+
+        let pageCount = doc.pageCount
+        let border = PDFBorder()
+        border.lineWidth = 0
+
+        for index in 0..<pageCount {
+            guard let page = doc.page(at: index) else { continue }
+            let bounds = page.bounds(for: .mediaBox)
+            let footerWidth: CGFloat = 90
+            let footerRect = CGRect(
+                x: bounds.midX - footerWidth / 2,
+                y: 18,
+                width: footerWidth,
+                height: 14
+            )
+            let footer = PDFAnnotation(bounds: footerRect, forType: .freeText, withProperties: nil)
+            footer.contents = "\(index + 1) / \(pageCount)"
+            footer.font = .systemFont(ofSize: 8.5, weight: .regular)
+            footer.fontColor = NSColor(calibratedWhite: 0.48, alpha: 1)
+            footer.alignment = .center
+            footer.color = .clear
+            footer.border = border
+            footer.shouldDisplay = true
+            footer.shouldPrint = true
+            page.addAnnotation(footer)
+        }
+
         return doc.dataRepresentation() ?? pdfData
     }
 

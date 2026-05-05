@@ -49,16 +49,124 @@ class NotesTableView: NSTableView {
     public var loadingQueue = OperationQueue()
     public var fillTimestamp: Int64?
     private var scrollSaveWorkItem: DispatchWorkItem?
+    private var separatorSelectionRows: IndexSet?
 
     override func draw(_ dirtyRect: NSRect) {
         dataSource = adapter
         delegate = adapter
-        if #available(macOS 26, *), UserDefaultsManagement.appearanceType != .Custom {
-            backgroundColor = .clear
-        } else {
-            backgroundColor = Theme.backgroundColor
-        }
+        backgroundColor = Theme.paneBackgroundColor
         super.draw(dirtyRect)
+    }
+
+    override func selectRowIndexes(_ indexes: IndexSet, byExtendingSelection extend: Bool) {
+        beginSynchronizedSelectionRedraw()
+        defer { endSynchronizedSelectionRedraw() }
+
+        let previousRows = currentSeparatorSelectionRows()
+        let pendingRows = extend ? previousRows.union(indexes) : indexes
+
+        separatorSelectionRows = pendingRows
+        invalidateSeparatorRows(changingFrom: previousRows, to: pendingRows, flush: true)
+
+        super.selectRowIndexes(indexes, byExtendingSelection: extend)
+
+        syncSeparatorSelectionRows(previousRows: previousRows.union(pendingRows))
+    }
+
+    override func deselectRow(_ row: Int) {
+        beginSynchronizedSelectionRedraw()
+        defer { endSynchronizedSelectionRedraw() }
+
+        let previousRows = currentSeparatorSelectionRows()
+        var pendingRows = previousRows
+        pendingRows.remove(row)
+
+        separatorSelectionRows = pendingRows
+        invalidateSeparatorRows(changingFrom: previousRows, to: pendingRows, flush: true)
+
+        super.deselectRow(row)
+
+        syncSeparatorSelectionRows(previousRows: previousRows.union(IndexSet(integer: row)))
+    }
+
+    override func deselectAll(_ sender: Any?) {
+        beginSynchronizedSelectionRedraw()
+        defer { endSynchronizedSelectionRedraw() }
+
+        let previousRows = currentSeparatorSelectionRows()
+
+        separatorSelectionRows = IndexSet()
+        invalidateSeparatorRows(changingFrom: previousRows, to: IndexSet(), flush: true)
+
+        super.deselectAll(sender)
+
+        syncSeparatorSelectionRows(previousRows: previousRows)
+    }
+
+    func shouldHideNoteSeparator(for rowView: NoteRowView) -> Bool {
+        let row = self.row(for: rowView)
+        guard row >= 0 else { return false }
+
+        let selectedRows = currentSeparatorSelectionRows()
+        guard !selectedRows.isEmpty else { return false }
+
+        return selectedRows.contains(row - 1) || selectedRows.contains(row + 1)
+    }
+
+    private func currentSeparatorSelectionRows() -> IndexSet {
+        separatorSelectionRows ?? selectedRowIndexes
+    }
+
+    private func syncSeparatorSelectionRows(previousRows: IndexSet) {
+        let currentRows = selectedRowIndexes
+        separatorSelectionRows = currentRows
+        invalidateSeparatorRows(changingFrom: previousRows, to: currentRows, flush: true)
+    }
+
+    private func beginSynchronizedSelectionRedraw() {
+        window?.disableScreenUpdatesUntilFlush()
+        NSAnimationContext.beginGrouping()
+        NSAnimationContext.current.duration = 0
+        NSAnimationContext.current.allowsImplicitAnimation = false
+    }
+
+    private func endSynchronizedSelectionRedraw() {
+        displayIfNeeded()
+        NSAnimationContext.endGrouping()
+    }
+
+    private func invalidateSeparatorRows(changingFrom previousRows: IndexSet, to currentRows: IndexSet, flush: Bool = false) {
+        var changedRows = previousRows
+        changedRows.formUnion(currentRows)
+
+        var affectedRows = IndexSet()
+        for row in changedRows {
+            affectedRows.formUnion(separatorAffectedRows(around: row))
+        }
+
+        guard !affectedRows.isEmpty else { return }
+
+        for row in affectedRows where row >= 0 && row < numberOfRows {
+            if let rowView = rowView(atRow: row, makeIfNecessary: false) {
+                rowView.needsDisplay = true
+            } else {
+                setNeedsDisplay(rect(ofRow: row))
+            }
+        }
+
+        if flush {
+            displayIfNeeded()
+        }
+    }
+
+    private func separatorAffectedRows(around selectedRow: Int) -> IndexSet {
+        guard selectedRow >= 0 else { return [] }
+
+        var rows = IndexSet()
+        for row in (selectedRow - 1)...(selectedRow + 1) where row >= 0 && row < numberOfRows {
+            rows.insert(row)
+        }
+        return rows
     }
 
     override func keyUp(with event: NSEvent) {
@@ -247,7 +355,7 @@ class NotesTableView: NSTableView {
                 // before it writes the wrong bytes into the outgoing note's file.
                 if EditTextView.note?.isEqualURL(url: currentNote.url) == true {
                     vc.editArea.saveTextStorageContent(to: currentNote)
-                    currentNote.save()
+                    currentNote.save(content: currentNote.content)
                 } else {
                     let mismatch = NSError(
                         domain: "com.tw93.miaoyan.race",
@@ -261,21 +369,9 @@ class NotesTableView: NSTableView {
                 saveScrollPosition()
             }
 
-            loadingQueue.cancelAllOperations()
-            let operation = BlockOperation()
-            operation.addExecutionBlock { [weak self, weak vc] in
-                DispatchQueue.main.async {
-                    guard !operation.isCancelled, self?.fillTimestamp == timestamp, let vc = vc else {
-                        return
-                    }
-                    // Avoid filling during note creation to prevent content flashing
-                    if UserDataService.instance.shouldBlockEditAreaUpdate() {
-                        return
-                    }
-                    vc.editArea.fill(note: note, options: .silent)
-                }
+            if !UserDataService.instance.shouldBlockEditAreaUpdate() {
+                vc.editArea.fill(note: note, options: .silent)
             }
-            loadingQueue.addOperation(operation)
         } else {
             // UX: Auto-select first note to avoid empty editor (unified behavior)
             if !noteList.isEmpty {

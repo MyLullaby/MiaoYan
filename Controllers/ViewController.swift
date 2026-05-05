@@ -195,15 +195,13 @@ class ViewController:
     @IBOutlet var formatButton: NSButton!
     @IBOutlet var previewButton: NSButton! {
         didSet {
-            previewButton.state = sessionPreviewMode ? .on : .off
-            previewButton.contentTintColor = sessionPreviewMode ? Theme.accentColor : nil
+            applyToolbarButtonState(previewButton, isActive: sessionPreviewMode, activeTint: Theme.accentColor, inactiveTint: Theme.inactiveIconColor)
         }
     }
 
     @IBOutlet var presentationButton: NSButton! {
         didSet {
-            presentationButton.state = sessionPresentationMode ? .on : .off
-            presentationButton.contentTintColor = sessionPresentationMode ? Theme.accentColor : nil
+            applyToolbarButtonState(presentationButton, isActive: sessionPresentationMode, activeTint: Theme.accentColor, inactiveTint: Theme.inactiveIconColor)
         }
     }
 
@@ -402,35 +400,44 @@ class ViewController:
         let inactive = Theme.inactiveIconColor
 
         // Toolbar Buttons (Unified Grey in all modes unless active)
-        previewButton?.state = sessionPreviewMode ? .on : .off
-        previewButton?.contentTintColor = sessionPreviewMode ? accent : inactive
+        applyToolbarButtonState(previewButton, isActive: sessionPreviewMode || sessionMagicPPTMode, activeTint: accent, inactiveTint: inactive)
 
         // Presentation
-        presentationButton?.state = sessionPresentationMode ? .on : .off
-        presentationButton?.contentTintColor = sessionPresentationMode ? accent : inactive
+        applyToolbarButtonState(presentationButton, isActive: sessionPresentationMode || sessionMagicPPTMode, activeTint: accent, inactiveTint: inactive)
 
         // Split View
-        toggleSplitButton?.state = sessionSplitMode ? .on : .off
         toggleSplitButton?.image?.isTemplate = true
-        toggleSplitButton?.contentTintColor = sessionSplitMode ? NSColor.controlAccentColor : inactive
+        applyToolbarButtonState(toggleSplitButton, isActive: sessionSplitMode, activeTint: accent, inactiveTint: inactive)
 
         // Sidebar Toggle (Active when sidebar is hidden)
         let isSidebarHidden = sidebarWidth == 0
-        toggleListButton?.state = isSidebarHidden ? .on : .off
         toggleListButton?.image?.isTemplate = true
-        toggleListButton?.contentTintColor = isSidebarHidden ? NSColor.controlAccentColor : inactive
+        applyToolbarButtonState(toggleListButton, isActive: isSidebarHidden, activeTint: accent, inactiveTint: inactive)
 
         // Format (Always inactive color)
+        formatButton?.state = .off
         formatButton?.contentTintColor = inactive
 
-        // Sidebar Action Buttons (Standard Label Color for Light/Dark adaptation)
-        // This ensures they are black in Light Mode and white in Dark Mode, not grey.
-        addProjectButton?.contentTintColor = .labelColor
+        addProjectButton?.state = .off
+        addProjectButton?.contentTintColor = Theme.sidebarActionColor
         for subview in notesListCustomView.subviews {
             if let btn = subview as? NSButton, btn.image?.name() == "newNote" {
                 btn.image?.isTemplate = true
-                btn.contentTintColor = .labelColor
+                btn.state = .off
+                btn.contentTintColor = Theme.sidebarActionColor
             }
+        }
+    }
+
+    func applyToolbarButtonState(_ button: NSButton?, isActive: Bool, activeTint: NSColor, inactiveTint: NSColor) {
+        guard let button else { return }
+
+        if Theme.usesModernSystemChrome {
+            button.state = .off
+            button.contentTintColor = isActive ? activeTint : inactiveTint
+        } else {
+            button.state = isActive ? .on : .off
+            button.contentTintColor = isActive ? activeTint : inactiveTint
         }
     }
 
@@ -730,18 +737,11 @@ class ViewController:
         previewButton.toolTip = I18n.str("Toggle Preview")
         presentationButton.toolTip = I18n.str("Presentation")
 
-        // Unify button sizes: set all to 20x20 and remove borders/backgrounds for consistency
+        // Unify button sizes and let newer systems render their own chrome.
         let toolbarButtons = [formatButton, previewButton, presentationButton, toggleListButton, toggleSplitButton].compactMap { $0 }
         for btn in toolbarButtons {
-            if #available(macOS 26, *) {
-                btn.bezelStyle = .glass
-                btn.isBordered = true
-            } else {
-                btn.isBordered = false
-                btn.bezelStyle = .texturedRounded
-            }
             btn.contentTintColor = .secondaryLabelColor
-            btn.imagePosition = .imageOnly
+            Theme.configureChromeIconButton(btn)
 
             for constraint in btn.constraints {
                 if constraint.firstAttribute == .width {
@@ -760,25 +760,20 @@ class ViewController:
         if let image = NSImage(named: "icon_preview") {
             image.isTemplate = true
             previewButton.image = image
-            previewButton.contentTintColor = sessionPreviewMode ? Theme.accentColor : nil
+            applyToolbarButtonState(previewButton, isActive: sessionPreviewMode, activeTint: Theme.accentColor, inactiveTint: Theme.inactiveIconColor)
         }
         if let image = NSImage(named: "icon_presentation") {
             image.isTemplate = true
             presentationButton.image = image
-            presentationButton.contentTintColor = sessionPresentationMode ? Theme.accentColor : nil
+            applyToolbarButtonState(presentationButton, isActive: sessionPresentationMode, activeTint: Theme.accentColor, inactiveTint: Theme.inactiveIconColor)
         }
 
         // Create toggleSplitButton first (relative to formatButton to avoid overlap)
         if toggleSplitButton == nil {
             let button = NSButton()
             button.translatesAutoresizingMaskIntoConstraints = false
-            if #available(macOS 26, *) {
-                button.bezelStyle = .glass
-                button.isBordered = true
-            } else {
-                button.bezelStyle = .texturedRounded
-                button.isBordered = false
-            }
+            button.bezelStyle = .texturedRounded
+            button.isBordered = false
 
             // Use custom icon (Static split icon for both states per user request)
             if let image = NSImage(named: "icon_editor_split") {
@@ -790,6 +785,7 @@ class ViewController:
             button.action = #selector(toggleSplitMode(_:))
             button.contentTintColor = .secondaryLabelColor
             button.toolTip = I18n.str("Toggle Split Mode")
+            Theme.configureChromeIconButton(button)
 
             toggleSplitButton = button
         }
@@ -798,13 +794,8 @@ class ViewController:
         if toggleListButton == nil {
             let listButton = NSButton()
             listButton.translatesAutoresizingMaskIntoConstraints = false
-            if #available(macOS 26, *) {
-                listButton.bezelStyle = .glass
-                listButton.isBordered = true
-            } else {
-                listButton.bezelStyle = .texturedRounded
-                listButton.isBordered = false
-            }
+            listButton.bezelStyle = .texturedRounded
+            listButton.isBordered = false
             listButton.imagePosition = .imageOnly
 
             // Use custom icon
@@ -817,6 +808,7 @@ class ViewController:
             listButton.action = #selector(toggleLayoutCycle(_:))
             listButton.contentTintColor = .secondaryLabelColor
             listButton.toolTip = I18n.str("Toggle Note List")
+            Theme.configureChromeIconButton(listButton)
 
             parent.addSubview(listButton)
             listButton.wantsLayer = true
@@ -904,6 +896,7 @@ class ViewController:
 
         // Finalize Sidebar Action Buttons (New Note & Add Project) sizes to 20x20
         addProjectButton.imageScaling = .scaleProportionallyUpOrDown
+        Theme.configureChromeIconButton(addProjectButton)
         for constraint in addProjectButton.constraints {
             if constraint.firstAttribute == .width || constraint.firstAttribute == .height {
                 constraint.constant = 20
@@ -913,6 +906,7 @@ class ViewController:
         for subview in notesListCustomView.subviews {
             if let btn = subview as? NSButton, btn.image?.name() == "newNote" {
                 btn.imageScaling = .scaleProportionallyUpOrDown
+                Theme.configureChromeIconButton(btn)
                 for constraint in btn.constraints {
                     if constraint.firstAttribute == .width || constraint.firstAttribute == .height {
                         constraint.constant = 20
@@ -968,6 +962,43 @@ class ViewController:
         // Configure split view for editor content
         configureEditorContentSplitView()
         ensurePanelsVisibleAtStartup()
+        applyModernChromeStyling()
+    }
+
+    func applyModernChromeStyling() {
+        view.applyMiaoYanPaneBackground()
+        notesListCustomView.applyMiaoYanPaneBackground()
+        outlineHeader.applyMiaoYanPaneBackground()
+        projectHeaderView.applyMiaoYanPaneBackground()
+
+        storageOutlineView.backgroundColor = Theme.paneBackgroundColor
+        notesTableView.backgroundColor = Theme.paneBackgroundColor
+
+        [sidebarScrollView, notesScrollView].forEach { scrollView in
+            scrollView?.drawsBackground = false
+            scrollView?.contentView.drawsBackground = false
+            scrollView?.contentView.backgroundColor = .clear
+        }
+
+        titleLabel.drawsBackground = false
+        titleLabel.backgroundColor = .clear
+        if let cell = titleLabel.cell as? NSTextFieldCell {
+            cell.drawsBackground = false
+            cell.backgroundColor = .clear
+        }
+
+        [formatButton, previewButton, presentationButton, toggleListButton, toggleSplitButton, addProjectButton].forEach {
+            Theme.configureChromeIconButton($0)
+        }
+        for subview in notesListCustomView.subviews {
+            if let button = subview as? NSButton {
+                Theme.configureChromeIconButton(button)
+            }
+        }
+        updateToolbarButtonTints()
+
+        (sidebarSplitView as? ThemedSplitView)?.applyDividerColor()
+        splitView.applyDividerColor()
     }
 
     private func configureEditorContentSplitView() {

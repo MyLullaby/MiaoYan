@@ -23,22 +23,25 @@
 
 ## Features
 
-- **Fantastic**: Local-first, no data collection, split editor & preview, LaTeX, Mermaid
-- **Beautiful**: Minimalist design, three-column layout, dark mode, distraction-free
+- **Fantastic**: Local-first, no data collection, split editor & preview, wikilink backlinks, LaTeX, Mermaid
+- **Beautiful**: Minimalist design, three-column layout, dark mode, macOS 26 glass, distraction-free
 - **Fast**: Swift 6 native, better performance than Electron-based apps
-- **Simple**: Lightweight, keyboard shortcuts, auto-formatting
+- **Simple**: Lightweight, version history, keyboard shortcuts, auto-formatting
 
 ## Installation
 
-Download from the **Mac App Store**; all future updates ship there. A paid download is the best way to support ongoing development; the open-source build offers the same experience.
+1. **Mac App Store** (paid, automatic updates):
 
-<a href="https://apps.apple.com/cn/app/miaoyan/id6759252269"><img src="https://cdn.tw93.fun/uPic/C3Renh.png" width="160" alt="Download on the Mac App Store" /></a>
+   <a href="https://apps.apple.com/cn/app/miaoyan/id6759252269"><img src="https://cdn.tw93.fun/uPic/C3Renh.png" width="160" alt="Download on the Mac App Store" /></a>
 
-After installing, create a `MiaoYan` folder in iCloud Drive or your preferred location, open Preferences (⌘,), set the storage path, and start writing. Existing sponsors can DM me directly for an App Store redemption code.
+2. **Homebrew**:
+   ```bash
+   brew install --cask miaoyan
+   ```
 
-### Build from source / older versions
+3. **GitHub Releases**: download the latest DMG from [GitHub Releases](https://github.com/tw93/MiaoYan/releases/latest) (macOS 11.5+)
 
-From **4.0** onward MiaoYan is distributed through the App Store. You can still build from the MIT-licensed source, or grab a pre-4.0 DMG from [GitHub Releases](https://github.com/tw93/MiaoYan/releases).
+All three options share the same codebase and receive the same updates. After installing, create a `MiaoYan` folder in iCloud Drive or your preferred location, open Preferences (⌘,), and set the storage path.
 
 ## CLI
 
@@ -76,7 +79,9 @@ Why not WYSIWYG like Typora? We prioritize pure Markdown editing experience, and
 
 - If MiaoYan helped you, [share it](https://twitter.com/intent/tweet?url=https://github.com/tw93/MiaoYan&text=MiaoYan%20-%20A%20fast%2C%20elegant%20Markdown%20editor%20for%20Mac.) with friends or give it a star.
 - Got ideas or bugs? Open an issue or PR, feel free to contribute your best AI model.
-- I have two cats, TangYuan and Coke. If you think MiaoYan delights your life, you can feed them <a href="https://miaoyan.app/cats.html?name=MiaoYan" target="_blank">canned food 🥩</a>.
+- I have two cats, TangYuan and Coke. If you think MiaoYan delights your life, you can feed them <a href="https://cats.tw93.fun?name=MiaoYan" target="_blank">canned food 🥩</a>.
+
+<a href="https://cats.tw93.fun?name=MiaoYan"><img src="https://cdn.jsdelivr.net/gh/tw93/sponsors@main/assets/sponsors.svg" width="1000" loading="lazy" /></a>
 
 ## Acknowledgments
 

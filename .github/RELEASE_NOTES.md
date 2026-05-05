@@ -1,23 +1,13 @@
-# V3.4.0 Mizutsune 🌊
+# V3.5.1
 
-非常感谢大家这 5 年的陪伴，妙言会持续维护下去。考虑到后面 iOS 多端开发和降低维护成本，从 4.0 开始会统一在 App Store 发布，源码持续开源，自行编译没问题。任何赞助过或给妙言提交过代码的小伙伴，欢迎直接找我要兑换码。
-
-这个版本主要的变化：
-
-1. 从 4.0 起改为 App Store 发布，这是最后一个 DMG 版本，后续请在 App Store 更新
-2. 应用内一次性迁移提示，方便老用户知道后续去哪里更新
-3. 分栏滚动从比例模式升级为行级同步，图片、代码块多的文档也能精准对齐
-4. 从 Finder 打开单个 .md 能正确展示同目录所有文件
-
-没有用过的小伙伴，欢迎去 App Store 试试看，玩玩。
+1. 修复 macOS 26 上工具栏按钮出现灰色背景条的问题
+2. 修复侧边栏和笔记列表在 macOS 26 上背景透明的问题
+3. 优化笔记切换速度,已加载笔记走同步路径,切换无延迟
+4. 切换笔记时保存改为异步防抖,不再阻塞主线程
 
 ---
 
-Thanks so much for five years of support. MiaoYan will keep going. To prepare for iOS and cross-device support and reduce maintenance overhead, from 4.0 onward MiaoYan will be distributed through the App Store. Source stays open and self-buildable. If you've sponsored or contributed code, feel free to DM me for a redemption code.
-
-Key changes in this release:
-
-1. From 4.0 onward MiaoYan moves to the App Store. This is the last DMG release; future updates will be on the App Store
-2. One-time in-app notice letting open-source build users know where to follow future updates
-3. Split-view scroll sync upgraded to line-based algorithm, accurate even in documents with images or code blocks
-4. Opening a single .md from Finder now shows all sibling files correctly
+1. Fix toolbar buttons showing grey background bar on macOS 26
+2. Fix transparent sidebar and notes list background on macOS 26
+3. Faster note switching: synchronous path for loaded notes, zero delay
+4. Debounced save on note switch, no longer blocking main thread

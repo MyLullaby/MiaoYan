@@ -26,7 +26,7 @@ public class Note: NSObject {
 
     public var imageUrl: [URL]?
     public var isParsed = false
-    private var isContentLoaded = false
+    private(set) var isContentLoaded = false
 
     // Debounce for save operations
     private var saveWorkItem: DispatchWorkItem?
@@ -565,17 +565,17 @@ public class Note: NSObject {
 
             modifiedLocalAt = Date()
             NoteVersionManager.shared.saveVersionIfNeeded(for: self)
+            WikilinkIndex.shared.updateNote(title: title, content: attributedString.string)
         } catch {
             AppDelegate.trackError(error, context: "Note.writeError")
             AppDelegate.trackError(error, context: "Note.write")
 
-            DispatchQueue.main.async {
-                let alert = NSAlert()
-                alert.messageText = I18n.str("Save Failed")
-                alert.informativeText = I18n.str(error.localizedDescription)
-                alert.alertStyle = .warning
-                alert.addButton(withTitle: I18n.str("OK"))
-                alert.runModal()
+            Task { @MainActor in
+                MiaoYanAlert.show(
+                    message: I18n.str("Save Failed"),
+                    informativeText: I18n.str(error.localizedDescription),
+                    style: .warning
+                )
             }
             return
         }
