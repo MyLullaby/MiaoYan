@@ -17,8 +17,9 @@ struct NoteFile: Identifiable, Equatable, Sendable {
     /// for seconds on iCloud placeholder files that haven't synced
     /// down yet.
     init(snapshotEntry entry: RecentNotesSnapshot.Entry) {
-        self.id = entry.urlString
-        self.url = URL(string: entry.urlString) ?? URL(fileURLWithPath: "/")
+        let url = URL(fileURLWithPath: entry.path)
+        self.id = url.absoluteString
+        self.url = url
         self.title = entry.title
         self.modifiedDate = entry.modifiedDate
         self.createdDate = entry.modifiedDate
@@ -28,7 +29,7 @@ struct NoteFile: Identifiable, Equatable, Sendable {
     }
 
     /// Lightweight initializer that does not touch file contents.
-    /// Preview is filled in lazily by `NoteFileStore.fillPreviews(for:)`.
+    /// Preview is filled in lazily by the card layer.
     init(url: URL, preview: String = "") {
         let values = try? url.resourceValues(forKeys: [
             .contentModificationDateKey,
@@ -94,18 +95,44 @@ enum NoteFileStore {
 
     /// Pre-compiled regexes for `stripPreviewNoise`. Compiling per-call
     /// would dominate CPU for a 1500-note search.
-    nonisolated(unsafe) private static let htmlTagRegex = try? NSRegularExpression(
+    private static let htmlTagRegex = try? NSRegularExpression(
         pattern: "<[^>]+>", options: [])
-    nonisolated(unsafe) private static let mdImageRegex = try? NSRegularExpression(
+    private static let mdImageRegex = try? NSRegularExpression(
         pattern: "!\\[[^\\]]*\\]\\([^)]*\\)", options: [])
-    nonisolated(unsafe) private static let mdLinkRegex = try? NSRegularExpression(
+    private static let mdLinkRegex = try? NSRegularExpression(
         pattern: "\\[([^\\]]*)\\]\\([^)]*\\)", options: [])
-    nonisolated(unsafe) private static let bareUrlRegex = try? NSRegularExpression(
+    private static let bareUrlRegex = try? NSRegularExpression(
         pattern: "https?://\\S+", options: [])
-    nonisolated(unsafe) private static let inlineCodeRegex = try? NSRegularExpression(
+    private static let inlineCodeRegex = try? NSRegularExpression(
         pattern: "`([^`]+)`", options: [])
-    nonisolated(unsafe) private static let whitespaceRunRegex = try? NSRegularExpression(
+    private static let whitespaceRunRegex = try? NSRegularExpression(
         pattern: "\\s+", options: [])
+    private static let frontmatterDashRegex = try? NSRegularExpression(
+        pattern: "\\A---.*?---\\n?", options: [.dotMatchesLineSeparators])
+    private static let frontmatterPlusRegex = try? NSRegularExpression(
+        pattern: "\\A\\+\\+\\+.*?\\+\\+\\+\\n?", options: [.dotMatchesLineSeparators])
+    private static let codeBlockRegex = try? NSRegularExpression(
+        pattern: "```.*?```", options: [.dotMatchesLineSeparators])
+    private static let mdMarkerRegex = try? NSRegularExpression(
+        pattern: "^[#>*+\\-]+\\s*", options: [.anchorsMatchLines])
+    private static let mdOrderedListRegex = try? NSRegularExpression(
+        pattern: "^\\d+[\\.\\)、]\\s*", options: [.anchorsMatchLines])
+    /// `**` and `__` first (greedy), then single `*` and `_`, then `~~`.
+    /// Order matters: `**` must be consumed before `*`.
+    private static let emphasisRegex = try? NSRegularExpression(
+        pattern: "\\*\\*|__|~~|[*_]", options: [])
+    private static let checkboxRegex = try? NSRegularExpression(
+        pattern: "\\[[ xX]\\]\\s*", options: [])
+    private static let wikilinkRegex = try? NSRegularExpression(
+        pattern: "\\[\\[(?:[^\\]|]*\\|)?([^\\]]*)\\]\\]", options: [])
+    private static let tableSepRegex = try? NSRegularExpression(
+        pattern: "^[\\|\\-:]+$", options: [.anchorsMatchLines])
+    private static let tablePipeRegex = try? NSRegularExpression(
+        pattern: "\\|", options: [])
+    private static let hrUnderscoreRegex = try? NSRegularExpression(
+        pattern: "^_{3,}$", options: [.anchorsMatchLines])
+    private static let htmlEntityRegex = try? NSRegularExpression(
+        pattern: "&[a-zA-Z]+;|&#\\d+;", options: [])
 
     /// Remove HTML tags and Markdown noise (raw image syntax, link URLs,
     /// bare URLs, inline-code backticks) so card previews and search
@@ -122,6 +149,24 @@ enum NoteFileStore {
         if let re = htmlTagRegex {
             s = re.stringByReplacingMatches(in: s, range: full(s), withTemplate: "")
         }
+        if let re = htmlEntityRegex {
+            s = re.stringByReplacingMatches(in: s, range: full(s), withTemplate: "")
+        }
+        if let re = wikilinkRegex {
+            s = re.stringByReplacingMatches(in: s, range: full(s), withTemplate: "$1")
+        }
+        if let re = checkboxRegex {
+            s = re.stringByReplacingMatches(in: s, range: full(s), withTemplate: "")
+        }
+        if let re = tableSepRegex {
+            s = re.stringByReplacingMatches(in: s, range: full(s), withTemplate: "")
+        }
+        if let re = tablePipeRegex {
+            s = re.stringByReplacingMatches(in: s, range: full(s), withTemplate: " ")
+        }
+        if let re = hrUnderscoreRegex {
+            s = re.stringByReplacingMatches(in: s, range: full(s), withTemplate: "")
+        }
         if let re = mdImageRegex {
             s = re.stringByReplacingMatches(in: s, range: full(s), withTemplate: "")
         }
@@ -134,10 +179,53 @@ enum NoteFileStore {
         if let re = inlineCodeRegex {
             s = re.stringByReplacingMatches(in: s, range: full(s), withTemplate: "$1")
         }
-        if let re = whitespaceRunRegex {
-            s = re.stringByReplacingMatches(in: s, range: full(s), withTemplate: " ")
+        // Whitespace collapse is intentionally NOT done here — newlines
+        // must survive so downstream stripMarkdownMarkers can anchor
+        // `^` to real line starts. Callers that need single-line output
+        // collapse whitespace after the full pipeline finishes.
+        return s
+    }
+
+    /// Strip YAML/TOML frontmatter fenced by `---` or `+++` at the
+    /// start of the file.
+    nonisolated private static func stripFrontmatter(_ input: String) -> String {
+        var s = input
+        let full = { (str: String) in NSRange(location: 0, length: (str as NSString).length) }
+        if let re = frontmatterDashRegex {
+            s = re.stringByReplacingMatches(in: s, range: full(s), withTemplate: "")
         }
-        return s.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let re = frontmatterPlusRegex {
+            s = re.stringByReplacingMatches(in: s, range: full(s), withTemplate: "")
+        }
+        return s
+    }
+
+    /// Strip fenced code blocks (``` ... ```).
+    nonisolated private static func stripCodeBlocks(_ input: String) -> String {
+        guard let re = codeBlockRegex else { return input }
+        let full = NSRange(location: 0, length: (input as NSString).length)
+        return re.stringByReplacingMatches(in: input, range: full, withTemplate: "")
+    }
+
+    /// Strip Markdown line-start markers: `# `, `## `, `> `, `- `,
+    /// `* `, `+ `, `1. ` etc. Keeps the text content.
+    nonisolated private static func stripMarkdownMarkers(_ input: String) -> String {
+        var s = input
+        let full = { (str: String) in NSRange(location: 0, length: (str as NSString).length) }
+        if let re = mdMarkerRegex {
+            s = re.stringByReplacingMatches(in: s, range: full(s), withTemplate: "")
+        }
+        if let re = mdOrderedListRegex {
+            s = re.stringByReplacingMatches(in: s, range: full(s), withTemplate: "")
+        }
+        return s
+    }
+
+    /// Strip bold/italic/strikethrough markers (`**`, `*`, `__`, `_`, `~~`).
+    nonisolated private static func stripEmphasisMarkers(_ input: String) -> String {
+        guard let re = emphasisRegex else { return input }
+        let full = NSRange(location: 0, length: (input as NSString).length)
+        return re.stringByReplacingMatches(in: input, range: full, withTemplate: "")
     }
 
     /// Read up to `maxBytes` from a file via plain FileHandle, no
@@ -276,19 +364,42 @@ enum NoteFileStore {
             .sorted(by: sortNotes)
     }
 
-    /// Lazy preview helper for the card layer. Returns nil for iCloud files
-    /// that haven't been downloaded yet, so visible cards never trigger a
-    /// blocking download just to render a two-line snippet. Once the file is
-    /// downloaded by NSMetadataQuery, the next revision bump re-renders the
-    /// card and this returns the preview.
+    /// Lazy preview helper for the card layer.
+    ///
+    /// Fast path: `previewTextSync` reads via plain `FileHandle` — if
+    /// the file is already on disk this takes microseconds.
+    ///
+    /// Slow path: if `FileHandle` fails (iCloud placeholder — the real
+    /// file lives at `.filename.icloud`), we fall back to
+    /// `coordinatedReadString` which transparently triggers an iCloud
+    /// on-demand download. This is slower (~100-500ms per file) but
+    /// guarantees the user sees a preview for every note they scroll
+    /// past. The coordinated read is bounded to 900 bytes via the
+    /// downstream pipeline so we never download a full file just for
+    /// a preview snippet.
+    ///
+    /// Callers must use `.low` task priority so 40+ concurrent probes
+    /// don't saturate the CPU with regex work.
     nonisolated static func previewIfDownloaded(for url: URL) -> String? {
-        let status =
-            (try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])
-                .ubiquitousItemDownloadingStatus)
-        // Non-iCloud files have no status (nil) — proceed.
-        // iCloud files only proceed when fully current locally.
-        if let status, status != .current { return nil }
-        return previewTextSync(for: url)
+        // Fast path: file already on disk.
+        let fast = previewTextSync(for: url)
+        if !fast.isEmpty { return fast }
+
+        // Slow path: iCloud placeholder. NSFileCoordinator triggers the
+        // download transparently and hands us the bytes once ready.
+        guard let body = try? coordinatedReadString(at: url) else { return nil }
+        let head = String(body.prefix(900))
+        var s = head
+        s = stripFrontmatter(s)
+        s = stripCodeBlocks(s)
+        s = stripMarkdownMarkers(s)
+        s = stripPreviewNoise(s)
+        s = stripEmphasisMarkers(s)
+        let lines = s.components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let result = lines.prefix(2).joined(separator: " ")
+        return result.isEmpty ? nil : result
     }
 
     static func recentNotes(in root: URL, limit: Int = recentNoteLimit) async -> [NoteFile] {
@@ -549,6 +660,10 @@ enum NoteFileStore {
 
     // MARK: - Internal: file IO
 
+    /// Pure regex-pipeline preview: strip every non-prose element, then
+    /// take the first two content lines after the title. No line-level
+    /// if/else logic — just successive regex passes that delete
+    /// structural markup and leave clean text.
     nonisolated static func previewTextSync(for url: URL) -> String {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return "" }
         defer { try? handle.close() }
@@ -557,20 +672,20 @@ enum NoteFileStore {
             let head = String(data: data, encoding: .utf8)
         else { return "" }
 
-        let lines = head.components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { line in
-                !line.isEmpty
-                    && !line.hasPrefix("#")
-                    && !line.hasPrefix("---")
-                    && !line.hasPrefix("```")
-                    && !line.hasPrefix("!")
-            }
+        var s = head
+        s = stripFrontmatter(s)
+        s = stripCodeBlocks(s)
+        // Markers BEFORE noise: stripMarkdownMarkers uses ^ anchors that
+        // need real newlines. stripPreviewNoise no longer collapses
+        // whitespace, so newlines survive into this step.
+        s = stripMarkdownMarkers(s)
+        s = stripPreviewNoise(s)
+        s = stripEmphasisMarkers(s)
 
-        // Line filter handles whole-line markdown noise; the post-pass
-        // handles inline noise (HTML tags, ![](...), [text](url), bare
-        // URLs, inline-code backticks) that survives the line filter.
-        return stripPreviewNoise(lines.prefix(2).joined(separator: " "))
+        let lines = s.components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return lines.prefix(2).joined(separator: " ")
     }
 
     nonisolated static func coordinatedReadString(at url: URL) throws -> String {
@@ -639,7 +754,9 @@ enum NoteFileStore {
         from content: String, query: String, knownRange: Range<String.Index>? = nil
     ) -> String {
         let opts: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
-        let cleaned = stripPreviewNoise(content)
+        var cleaned = stripMarkdownMarkers(content)
+        cleaned = stripPreviewNoise(cleaned)
+        cleaned = stripEmphasisMarkers(cleaned)
         guard let range = cleaned.range(of: query, options: opts) else {
             // Title-only match (no body hit) — fall back to a clean
             // opening snippet rather than echoing raw markdown.
