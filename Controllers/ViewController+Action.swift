@@ -71,7 +71,7 @@ extension ViewController {
         if UserDefaultsManagement.isSingleMode {
             UserDefaultsManagement.clearSingleMode()
             UserDefaultsManagement.isFirstLaunch = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + UIDelay.short) {
                 NSApplication.shared.terminate(self)
             }
         } else {
@@ -548,16 +548,14 @@ extension ViewController {
 
     private static func preferredTerminalBundleID() -> String {
         let candidates = [
-            "fun.tw93.kaku",               // Kaku
-            "dev.warp.Warp-Stable",        // Warp
-            "com.googlecode.iterm2",        // iTerm2
-            "net.kovidgoyal.kitty",         // Kitty
-            "com.apple.Terminal",           // Terminal (always present)
+            "fun.tw93.kaku",  // Kaku
+            "dev.warp.Warp-Stable",  // Warp
+            "com.googlecode.iterm2",  // iTerm2
+            "net.kovidgoyal.kitty",  // Kitty
+            "com.apple.Terminal",  // Terminal (always present)
         ]
-        for id in candidates {
-            if NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) != nil {
-                return id
-            }
+        for id in candidates where NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) != nil {
+            return id
         }
         return "com.apple.Terminal"
     }
@@ -1218,81 +1216,6 @@ extension ViewController {
         }
     }
 
-    // MARK: - Export Operations
-    func exportFile(type: String) {
-        sessionIsExporting = true
-        shouldRestorePreviewAfterExport = false
-
-        if type == "Html" {
-            sessionIsExportingHTML = true
-            // HTML export can be done immediately without preview
-            self.editArea.markdownView?.exportHtml()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                self.sessionIsExporting = false
-                self.sessionIsExportingHTML = false
-            }
-            return
-        }
-
-        // For PDF and Image exports, enable preview and wait for proper loading
-        // For PDF and Image exports, ensure preview is enabled
-        // Only toggle if not already in preview to avoid unnecessary reload
-        if !shouldShowPreview {
-            enablePreview()
-            shouldRestorePreviewAfterExport = true
-        }
-
-        // Wait briefly for view initialization if needed, then trigger export
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            switch type {
-            case "Image":
-                self.editArea.markdownView?.exportImage()
-            case "PDF":
-                self.editArea.markdownView?.exportPdf()
-            default:
-                break
-            }
-            // Logic for cleanup is handled in the completion callbacks (toastExport)
-        }
-    }
-
-    public func toastExport(status: Bool) {
-        if status {
-            toast(message: I18n.str("Saved to Downloads folder~"), style: .success)
-        } else {
-            toast(message: I18n.str("Export failed"), style: .failure)
-        }
-        // After the export is completed, restore the original state.
-        sessionIsExporting = false
-        sessionIsExportingPPT = false
-        sessionIsExportingHTML = false
-        shouldDisablePPTAfterExport = false
-        if shouldRestorePreviewAfterExport {
-            disablePreview()
-            shouldRestorePreviewAfterExport = false
-        }
-    }
-
-    public func toastNoTitle() {
-        toast(message: I18n.str("Please make sure your title exists~"), style: .failure)
-    }
-
-    public func toastMoreTitle() {
-        toast(message: I18n.str("Found that there are multiple titles of this~"), style: .failure)
-    }
-
-    public func toastImageSet(name: String) {
-        toast(message: String(format: I18n.str("Please make sure your Mac is installed %@ ~"), name), style: .failure)
-    }
-
-    public func toastUpload(status: Bool) {
-        if status {
-            toast(message: I18n.str("Image upload in progress~"))
-        } else {
-            toast(message: I18n.str("Image upload failed, Use local~"), style: .failure)
-        }
-    }
-
     // MARK: - Utility Methods
     func activeShortcut() {
         guard let mainWindow = MainWindowController.shared() else {
@@ -1415,6 +1338,19 @@ extension ViewController {
 
         if event.modifierFlags.contains(.command), event.modifierFlags.contains(.option), event.keyCode == kVK_ANSI_U {
             copyURL(self)
+            return false
+        }
+
+        // ⌘= zoom-in alias (no Shift). The View-menu item carries "+" so ⌘+
+        // (⌘⇧=) routes through the menu; this branch adds the bare ⌘= without
+        // double-firing, since no menu item binds the "=" key.
+        if event.modifierFlags.contains(.command),
+            !event.modifierFlags.contains(.shift),
+            !event.modifierFlags.contains(.option),
+            !event.modifierFlags.contains(.control),
+            event.keyCode == kVK_ANSI_Equal
+        {
+            zoomInFontSize(self)
             return false
         }
 

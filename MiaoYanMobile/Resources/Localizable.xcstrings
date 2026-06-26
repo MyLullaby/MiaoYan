@@ -5,13 +5,34 @@
 
     },
     "%@ iCloud notes still downloading; results will improve as they sync." : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还有 %@ 篇 iCloud 笔记正在下载，同步完成后搜索结果会更全。"
+          }
+        }
+      }
     },
     "%@ notes" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 篇笔记"
+          }
+        }
+      }
     },
     "%@. Refresh library" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@。刷新笔记库"
+          }
+        }
+      }
     },
     "%lld notes" : {
       "extractionState" : "stale",
@@ -48,6 +69,16 @@
         }
       }
     },
+    "About" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关于"
+          }
+        }
+      }
+    },
     "All Notes" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -69,6 +100,16 @@
         }
       }
     },
+    "Appearance" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "外观"
+          }
+        }
+      }
+    },
     "Cancel" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -80,12 +121,33 @@
         }
       }
     },
+    "Checking iCloud Drive. You can choose a folder now." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在检查 iCloud Drive，你也可以现在选择文件夹。"
+          }
+        }
+      }
+    },
     "Choose folder" : {
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "选择文件夹"
+          }
+        }
+      }
+    },
+    "Choose Folder…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择文件夹…"
           }
         }
       }
@@ -157,7 +219,14 @@
       }
     },
     "Downloading your iCloud notes. Next launch will be instant." : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在从 iCloud 下载笔记，下次启动就会瞬间打开。"
+          }
+        }
+      }
     },
     "Edit" : {
       "extractionState" : "stale",
@@ -247,6 +316,16 @@
         }
       }
     },
+    "Library" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "笔记库"
+          }
+        }
+      }
+    },
     "Medium" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -265,6 +344,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "妙言"
+          }
+        }
+      }
+    },
+    "MiaoYan reads Markdown notes from this folder. Pick an iCloud Drive folder to keep notes synced with Mac." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MiaoYan 会从这个文件夹读取 Markdown 笔记。选择 iCloud Drive 文件夹可与 Mac 保持同步。"
           }
         }
       }
@@ -313,7 +402,6 @@
       }
     },
     "New note" : {
-      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -367,6 +455,16 @@
         }
       }
     },
+    "Note actions" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "笔记操作"
+          }
+        }
+      }
+    },
     "Notes" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -411,6 +509,16 @@
         }
       }
     },
+    "Pick a note from the list to start reading." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从列表中选择一篇笔记开始阅读。"
+          }
+        }
+      }
+    },
     "Pick the folder that stores your Markdown notes." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -418,6 +526,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选择存放 Markdown 笔记的文件夹。"
+          }
+        }
+      }
+    },
+    "Pin" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "置顶"
           }
         }
       }
@@ -531,8 +650,35 @@
         }
       }
     },
+    "Select a note" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择笔记"
+          }
+        }
+      }
+    },
     "Setting up your library" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在准备你的笔记库"
+          }
+        }
+      }
+    },
+    "Settings" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置"
+          }
+        }
+      }
     },
     "Share" : {
       "extractionState" : "stale",
@@ -651,6 +797,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请重新选择文件夹。"
+          }
+        }
+      }
+    },
+    "Unpin" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消置顶"
           }
         }
       }

@@ -385,6 +385,7 @@ class SidebarProjectView: NSOutlineView,
         updateIconLeading(cell, leading: defaultIconLeading)
         adjustIconSize(cell, size: defaultIconSize)
         setupBasicCellAppearance(cell, baseFont: baseFont)
+        updateLabelVerticalNudge(cell, nudge: Theme.Metrics.sidebarStandardLabelVerticalNudge)
         updateLabelSpacing(cell, spacing: defaultSpacing)
         alignContentVertically(cell)
     }
@@ -395,6 +396,11 @@ class SidebarProjectView: NSOutlineView,
         cell.icon.translatesAutoresizingMaskIntoConstraints = false
         cell.label.translatesAutoresizingMaskIntoConstraints = false
 
+        // Keep the view frames on the same center line. CJK ink is adjusted by
+        // SidebarLabelCell drawing, so the constraints remain stable.
+        let iconOffset = Theme.Metrics.sidebarStandardIconOffsetY
+        let labelOffset = Theme.Metrics.sidebarLabelOffsetY
+
         var hasIconCenterY = false
         var hasLabelCenterY = false
 
@@ -402,25 +408,31 @@ class SidebarProjectView: NSOutlineView,
             guard constraint.firstAttribute == .centerY && constraint.secondAttribute == .centerY else { continue }
             let first = constraint.firstItem as? NSView
             let second = constraint.secondItem as? NSView
-            if first === cell.icon || second === cell.icon {
-                constraint.constant = 0
+            if first === cell.icon {
+                constraint.constant = iconOffset
+                hasIconCenterY = true
+            } else if second === cell.icon {
+                constraint.constant = -iconOffset
                 hasIconCenterY = true
             }
-            if first === cell.label || second === cell.label {
-                constraint.constant = 0
+            if first === cell.label {
+                constraint.constant = labelOffset
+                hasLabelCenterY = true
+            } else if second === cell.label {
+                constraint.constant = -labelOffset
                 hasLabelCenterY = true
             }
         }
 
         if !hasIconCenterY {
             NSLayoutConstraint.activate([
-                cell.icon.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
+                cell.icon.centerYAnchor.constraint(equalTo: cell.centerYAnchor, constant: iconOffset)
             ])
         }
 
         if !hasLabelCenterY {
             NSLayoutConstraint.activate([
-                cell.label.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
+                cell.label.centerYAnchor.constraint(equalTo: cell.centerYAnchor, constant: labelOffset)
             ])
         }
     }
@@ -491,10 +503,21 @@ class SidebarProjectView: NSOutlineView,
         cell.layoutSubtreeIfNeeded()
     }
 
+    private func updateLabelVerticalNudge(_ cell: SidebarCellView, nudge: CGFloat) {
+        if let labelCell = cell.label.cell as? SidebarLabelCell {
+            labelCell.verticalNudge = nudge
+            cell.label.needsDisplay = true
+        }
+    }
+
     private func configureForSidebarItemType(_ cell: SidebarCellView, sidebarItem: SidebarItem, baseFont: NSFont, accentColor: NSColor) {
-        let accentIconSize: CGFloat = Theme.usesModernSystemChrome ? 20 : 24
-        let accentSpacing: CGFloat = Theme.usesModernSystemChrome ? 6 : 4
-        let accentIconLeading: CGFloat = Theme.usesModernSystemChrome ? 2 : -2
+        // The "妙言" header lockup keeps its pre-macOS-26 sizing: the modern
+        // chrome compaction (icon 24->20, font +2->+1) made it read noticeably
+        // smaller, which the maintainer rejected. Icon, spacing, leading and
+        // font weight stay at the larger legacy values on every OS.
+        let accentIconSize: CGFloat = 24
+        let accentSpacing: CGFloat = 4
+        let accentIconLeading: CGFloat = -2
         let accentFont = createAccentFont(from: baseFont)
 
         switch sidebarItem.type {
@@ -506,16 +529,22 @@ class SidebarProjectView: NSOutlineView,
             adjustIconSize(cell, size: accentIconSize)
             cell.label.font = accentFont
             cell.label.textColor = accentColor
+            updateLabelVerticalNudge(cell, nudge: Theme.Metrics.sidebarBrandLabelVerticalNudge)
             updateLabelSpacing(cell, spacing: accentSpacing)
             cell.label.lineBreakMode = .byTruncatingTail
             cell.label.cell?.truncatesLastVisibleLine = true
-            // Shift icon up to compensate for the bird icon's visual content being biased below center
+            // The bird icon has a different visual center from folder icons.
             for constraint in cell.constraints
-            where constraint.firstAttribute == .centerY && constraint.secondAttribute == .centerY
-                && (constraint.firstItem as? NSView) === cell.icon
-            {
-                constraint.constant = -3
-                break
+            where constraint.firstAttribute == .centerY && constraint.secondAttribute == .centerY {
+                let first = constraint.firstItem as? NSView
+                let second = constraint.secondItem as? NSView
+                if first === cell.icon {
+                    constraint.constant = Theme.Metrics.sidebarBrandIconOffsetY
+                    break
+                } else if second === cell.icon {
+                    constraint.constant = -Theme.Metrics.sidebarBrandIconOffsetY
+                    break
+                }
             }
 
         case .Trash:
@@ -536,7 +565,7 @@ class SidebarProjectView: NSOutlineView,
                 NSFontDescriptor.TraitKey.weight: NSNumber(value: Double(NSFont.Weight.semibold.rawValue))
             ]
         ])
-        let accentFontSize = baseFont.pointSize + (Theme.usesModernSystemChrome ? 1 : 2)
+        let accentFontSize = baseFont.pointSize + 2
         return NSFont(
             descriptor: accentFontDescriptor,
             size: accentFontSize
@@ -904,7 +933,7 @@ class SidebarProjectView: NSOutlineView,
             ) { [weak vc, weak v] confirmed in
                 guard let vc = vc, let v = v else { return }
                 if confirmed {
-                    guard let resultingItemUrl = Storage.sharedInstance().trashItem(url: project.url) else {
+                    guard let resultingItemUrl = self.storage.trashItem(url: project.url) else {
                         return
                     }
 
@@ -929,7 +958,7 @@ class SidebarProjectView: NSOutlineView,
     }
 
     @IBAction func addProject(_ sender: Any) {
-        let project = Storage.sharedInstance().getMainProject()
+        let project = storage.getMainProject()
         showAddFolderAlert(parentProject: project)
     }
 
@@ -1068,7 +1097,7 @@ class SidebarProjectView: NSOutlineView,
             return projects
         }
 
-        if let root = Storage.sharedInstance().getRootProject() {
+        if let root = storage.getRootProject() {
             return [root]
         }
         return nil
@@ -1253,11 +1282,15 @@ class SidebarProjectView: NSOutlineView,
                 if let isDirectory = resourceValues.isDirectory, isDirectory,
                     let isPackage = resourceValues.isPackage, !isPackage
                 {
+                    // Hide leaf folders that hold only inline attachments (images,
+                    // videos, etc.) with no notes inside, regardless of their name.
+                    if storage.isAttachmentOnlyFolder(url: fileURL) { continue }
+
                     let subProject = Project(url: fileURL, parent: project)
 
                     // Only add if not already in storage
-                    if !Storage.sharedInstance().projectExist(url: fileURL) {
-                        _ = Storage.sharedInstance().add(project: subProject)
+                    if !storage.projectExist(url: fileURL) {
+                        _ = storage.add(project: subProject)
                     }
 
                     let icon = NSImage(imageLiteralResourceName: "project")

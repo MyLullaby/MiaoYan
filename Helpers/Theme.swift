@@ -6,6 +6,41 @@ enum Theme {
     typealias Color = NSColor
     private static let noTintProminenceRawValue = 1
 
+    /// Shared layout metrics for the list / sidebar surfaces. Seeded with the
+    /// values we actively tune so future tweaks have one home instead of
+    /// scattered literals. Editor and preferences internals keep their own
+    /// constants for now (different subsystems, different values).
+    enum Metrics {
+        /// Corner radius for the rounded selection pill (sidebar rows).
+        static let selectionCornerRadius: CGFloat = 8
+        /// Horizontal inset of the selection pill from the row edge.
+        static let selectionInsetH: CGFloat = 6
+        /// Vertical inset of the selection pill from the row edge.
+        static let selectionInsetV: CGFloat = 3
+        /// Split widths below this are treated as collapsed.
+        static let collapsedSplitWidthEpsilon: CGFloat = 1
+        /// Project sidebar snap point when dragging toward the closed state.
+        static let sidebarCollapseSnapWidth: CGFloat = 86
+        /// Smallest useful note-list width. Below this the list shows clipped
+        /// dates and titles instead of a usable column.
+        static let noteListMinimumWidth: CGFloat = 220
+        /// Note-list snap point when dragging toward the closed state.
+        static let noteListCollapseSnapWidth: CGFloat = 180
+        /// Standard sidebar rows keep icon and label on the same Auto Layout
+        /// center. Text drawing is nudged separately to account for CJK ink.
+        static let sidebarStandardIconOffsetY: CGFloat = 0
+        static let sidebarLabelOffsetY: CGFloat = 0
+        static let sidebarStandardLabelVerticalNudge: CGFloat = 1.5
+        static let sidebarBrandLabelVerticalNudge: CGFloat = 3.5
+        static let sidebarBrandIconOffsetY: CGFloat = 0
+        /// Right-side gutter so long note titles truncate before the pane edge.
+        /// The visible gutter inside the selection pill varies by title because
+        /// truncation snaps to whole glyphs (CJK chars are ~14pt), so this is
+        /// tuned to center that spread near the ~12pt left padding rather than
+        /// to a single exact value.
+        static let noteListContentInset: CGFloat = 30
+    }
+
     static var textColor: Color {
         if UserDefaultsManagement.appearanceType != .Custom {
             return .labelColor
@@ -104,9 +139,18 @@ enum Theme {
         return usesModernSystemChrome ? .clear : backgroundColor
     }
 
+    /// Single faint hairline used by panel and settings dividers in modern
+    /// chrome. Collapses the former 0.10 / 0.12 split into one value so the
+    /// app has two divider tiers: this hairline and the stronger
+    /// `dividerColor` (0.18). The notes list keeps its own ultra-faint
+    /// `noteSeparatorColor` (0.07) on purpose.
+    static var hairlineColor: Color {
+        .separatorColor.withAlphaComponent(0.10)
+    }
+
     static var settingsDividerColor: Color {
         if usesModernSystemChrome {
-            return .separatorColor.withAlphaComponent(0.10)
+            return hairlineColor
         }
 
         return dividerColor
@@ -136,7 +180,7 @@ enum Theme {
 
     static var panelHairlineColor: Color {
         if usesModernSystemChrome {
-            return .separatorColor.withAlphaComponent(0.12)
+            return hairlineColor
         }
 
         return dividerColor
@@ -186,10 +230,6 @@ enum Theme {
             return UserDefaultsManagement.fontColor
         }
 
-        if usesModernSystemChrome {
-            return .secondaryLabelColor
-        }
-
         return NSColor(named: "toolbarIcon") ?? .labelColor
     }
 
@@ -215,7 +255,11 @@ enum Theme {
 
     static var splitDividerColor: Color {
         if usesModernSystemChrome {
-            return noteSeparatorColor
+            // Use the 0.10 hairline tier rather than the notes list's 0.07.
+            // A single vertical column divider reads fainter than the field of
+            // stacked horizontal row separators, so it needs one tier up to
+            // look as present as the note separators do.
+            return hairlineColor
         }
 
         return dividerColor

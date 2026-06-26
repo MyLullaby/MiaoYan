@@ -23,10 +23,8 @@ BACKGROUND_IMAGE_NAME="$(basename "$BACKGROUND_IMAGE_SOURCE")"
 
 if [[ -z "$VERSION" ]]; then
   VERSION="$(
-    grep "MARKETING_VERSION" "$PROJECT_DIR/MiaoYan.xcodeproj/project.pbxproj" \
-      | head -1 \
-      | sed 's/.*= \(.*\);/\1/' \
-      | tr -d ' '
+    awk -F'=|;' '/MARKETING_VERSION/ { gsub(/[[:space:]]/, "", $2); print $2; exit }' \
+      "$PROJECT_DIR/MiaoYan.xcodeproj/project.pbxproj"
   )"
 fi
 
@@ -50,6 +48,38 @@ base64_decode() {
     base64 --decode
   else
     base64 -D
+  fi
+}
+
+submit_notary() {
+  local artifact_path="$1"
+  local output_file="$2"
+
+  if [[ -n "$NOTARY_KEY_ID" && -n "$NOTARY_ISSUER_ID" && -n "$NOTARY_API_KEY_P8" ]]; then
+    local notary_key_file="$BUILD_DIR/AuthKey.p8"
+    if [[ ! -f "$notary_key_file" ]]; then
+      printf '%s' "$NOTARY_API_KEY_P8" | base64_decode >"$notary_key_file"
+    fi
+    xcrun notarytool submit "$artifact_path" \
+      --key "$notary_key_file" \
+      --key-id "$NOTARY_KEY_ID" \
+      --issuer "$NOTARY_ISSUER_ID" \
+      --wait | tee "$output_file"
+  elif [[ -n "$NOTARY_APPLE_ID" && -n "$NOTARY_PASSWORD" && -n "$TEAM_ID" ]]; then
+    xcrun notarytool submit "$artifact_path" \
+      --apple-id "$NOTARY_APPLE_ID" \
+      --team-id "$TEAM_ID" \
+      --password "$NOTARY_PASSWORD" \
+      --wait | tee "$output_file"
+  else
+    echo "Notary credentials missing. Provide API key credentials or Apple ID credentials." >&2
+    exit 1
+  fi
+
+  if ! grep -q "status: Accepted" "$output_file"; then
+    echo "Notarization failed for $artifact_path." >&2
+    cat "$output_file" >&2
+    exit 1
   fi
 }
 
@@ -161,31 +191,8 @@ codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 NOTARY_ZIP="$BUILD_DIR/MiaoYan_for_notary.zip"
 ditto -c -k --keepParent "$APP_PATH" "$NOTARY_ZIP"
 
-NOTARY_OUTPUT_FILE="$BUILD_DIR/notary-submit.log"
-if [[ -n "$NOTARY_KEY_ID" && -n "$NOTARY_ISSUER_ID" && -n "$NOTARY_API_KEY_P8" ]]; then
-  NOTARY_KEY_FILE="$BUILD_DIR/AuthKey.p8"
-  printf '%s' "$NOTARY_API_KEY_P8" | base64_decode >"$NOTARY_KEY_FILE"
-  xcrun notarytool submit "$NOTARY_ZIP" \
-    --key "$NOTARY_KEY_FILE" \
-    --key-id "$NOTARY_KEY_ID" \
-    --issuer "$NOTARY_ISSUER_ID" \
-    --wait | tee "$NOTARY_OUTPUT_FILE"
-elif [[ -n "$NOTARY_APPLE_ID" && -n "$NOTARY_PASSWORD" && -n "$TEAM_ID" ]]; then
-  xcrun notarytool submit "$NOTARY_ZIP" \
-    --apple-id "$NOTARY_APPLE_ID" \
-    --team-id "$TEAM_ID" \
-    --password "$NOTARY_PASSWORD" \
-    --wait | tee "$NOTARY_OUTPUT_FILE"
-else
-  echo "Notary credentials missing. Provide API key credentials or Apple ID credentials." >&2
-  exit 1
-fi
-
-if ! grep -q "status: Accepted" "$NOTARY_OUTPUT_FILE"; then
-  echo "Notarization failed." >&2
-  cat "$NOTARY_OUTPUT_FILE" >&2
-  exit 1
-fi
+NOTARY_OUTPUT_FILE="$BUILD_DIR/notary-submit-app.log"
+submit_notary "$NOTARY_ZIP" "$NOTARY_OUTPUT_FILE"
 
 xcrun stapler staple "$APP_PATH"
 
@@ -267,16 +274,21 @@ if [[ ! -f "$DMG_PATH" ]]; then
   exit 1
 fi
 
-xcrun stapler staple "$DMG_PATH" || true
+codesign --force --timestamp --sign "$SIGNING_IDENTITY" "$DMG_PATH"
+codesign --verify --verbose=2 "$DMG_PATH"
+
+DMG_NOTARY_OUTPUT_FILE="$BUILD_DIR/notary-submit-dmg.log"
+submit_notary "$DMG_PATH" "$DMG_NOTARY_OUTPUT_FILE"
+xcrun stapler staple "$DMG_PATH"
 rm -rf "$STAGING_DIR" "$TEMP_DMG_PATH"
 
-SIGN_UPDATE="$(
-  find "$HOME/Library/Developer/Xcode/DerivedData" \
-    -path "*/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update" \
-    -type f \
-    2>/dev/null \
-    | head -1
-)"
+SIGN_UPDATE_CANDIDATES="$BUILD_DIR/sign_update_candidates.txt"
+find "$HOME/Library/Developer/Xcode/DerivedData" \
+  -path "*/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update" \
+  -type f \
+  >"$SIGN_UPDATE_CANDIDATES" \
+  2>/dev/null
+SIGN_UPDATE="$(sed -n '1p' "$SIGN_UPDATE_CANDIDATES")"
 
 if [[ -z "$SIGN_UPDATE" || ! -x "$SIGN_UPDATE" ]]; then
   echo "Sparkle sign_update tool not found." >&2
@@ -284,18 +296,25 @@ if [[ -z "$SIGN_UPDATE" || ! -x "$SIGN_UPDATE" ]]; then
 fi
 
 SPARKLE_KEY_FILE="$BUILD_DIR/sparkle_private.key"
-printf '%s' "$SPARKLE_PRIVATE_KEY_BASE64" | base64_decode >"$SPARKLE_KEY_FILE"
+printf '%s\n' "$SPARKLE_PRIVATE_KEY_BASE64" >"$SPARKLE_KEY_FILE"
 
 SPARKLE_OUTPUT="$(
-  base64 <"$SPARKLE_KEY_FILE" | "$SIGN_UPDATE" --ed-key-file - "$ZIP_PATH"
+  "$SIGN_UPDATE" --ed-key-file "$SPARKLE_KEY_FILE" "$ZIP_PATH"
 )"
-SPARKLE_SIGNATURE="$(echo "$SPARKLE_OUTPUT" | grep "sparkle:edSignature" | sed 's/.*sparkle:edSignature="\([^"]*\)".*/\1/')"
+SPARKLE_SIGNATURE=""
+if [[ "$SPARKLE_OUTPUT" =~ sparkle:edSignature=\"([^\"]+)\" ]]; then
+  SPARKLE_SIGNATURE="${BASH_REMATCH[1]}"
+fi
 
 if [[ -z "$SPARKLE_SIGNATURE" ]]; then
   echo "Failed to parse Sparkle signature." >&2
   echo "$SPARKLE_OUTPUT" >&2
   exit 1
 fi
+
+"$PROJECT_DIR/scripts/release-ci/verify_sparkle_signature.sh" \
+  --zip "$ZIP_PATH" \
+  --signature "$SPARKLE_SIGNATURE"
 
 ZIP_SIZE="$(stat -f%z "$ZIP_PATH")"
 PUB_DATE="$(LC_ALL=C date -u "+%a, %d %b %Y %H:%M:%S +0000")"

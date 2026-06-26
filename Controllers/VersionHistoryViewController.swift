@@ -137,6 +137,7 @@ final class VersionHistoryViewController: NSViewController {
         super.init(nibName: nil, bundle: nil)
     }
 
+    @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("init(coder:) not supported")
     }
@@ -481,8 +482,8 @@ final class VersionHistoryViewController: NSViewController {
     @objc private func restoreAction() {
         let row = tableView.selectedRow
         guard row >= 0, row < entries.count,
-              case .saved(let date, let url) = entries[row],
-              let text = try? String(contentsOf: url, encoding: .utf8)
+            case .saved(let date, let url) = entries[row],
+            let text = try? String(contentsOf: url, encoding: .utf8)
         else { return }
 
         NoteVersionManager.shared.saveVersionIfNeeded(for: note, force: true)
@@ -500,7 +501,7 @@ final class VersionHistoryViewController: NSViewController {
     private func reselect() {
         DispatchQueue.main.async { [weak self] in
             guard let self, let vc = ViewController.shared(),
-                  let index = vc.notesTableView.getIndex(self.note)
+                let index = vc.notesTableView.getIndex(self.note)
             else { return }
             vc.notesTableView.selectRowIndexes([index], byExtendingSelection: false)
         }
@@ -524,7 +525,9 @@ extension VersionHistoryViewController: NSTableViewDelegate {
         cell.configure(
             primary: primaryLabel(for: entry),
             secondary: secondaryLabel(for: entry),
-            isCurrent: { if case .current = entry { return true }; return false }()
+            isCurrent: {
+                if case .current = entry { return true }; return false
+            }()
         )
         return cell
     }
@@ -539,7 +542,10 @@ extension VersionHistoryViewController: NSTableViewDelegate {
 
 @MainActor
 private final class VersionHistoryRowView: NSTableRowView {
-    override var isEmphasized: Bool { get { false } set {} }
+    override var isEmphasized: Bool {
+        get { false }
+        set {}
+    }
 
     override var isSelected: Bool {
         didSet {
@@ -610,6 +616,7 @@ private final class VersionHistoryCellView: NSView {
         ])
     }
 
+    @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
     private var isCurrent = false
@@ -629,7 +636,8 @@ private final class VersionHistoryCellView: NSView {
     private func applyStyle(selected: Bool) {
         let active = isCurrent || selected
         primaryField.font = active ? .boldSystemFont(ofSize: 12.5) : .systemFont(ofSize: 12.5)
-        dotView.layer?.backgroundColor = active
+        dotView.layer?.backgroundColor =
+            active
             ? Theme.accentColor.cgColor
             : Theme.secondaryTextColor.withAlphaComponent(0.4).cgColor
     }

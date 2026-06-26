@@ -5,9 +5,13 @@ class EditorSplitView: ThemedSplitView {
     public var shouldHideDivider = false
 
     override func currentDividerColor() -> NSColor {
+        isDividerHidden ? .clear : Theme.splitDividerColor
+    }
+
+    private var isDividerHidden: Bool {
         let notelistWidth = subviews.first?.frame.width ?? 0
-        let hideDivider = notelistWidth == 0 || shouldHideDivider
-        return hideDivider ? Theme.paneBackgroundColor : Theme.splitDividerColor
+        let isNotelistHidden = subviews.first?.isHidden == true
+        return isNotelistHidden || notelistWidth <= Theme.Metrics.collapsedSplitWidthEpsilon || shouldHideDivider
     }
 
     override func minPossiblePositionOfDivider(at dividerIndex: Int) -> CGFloat {
@@ -23,12 +27,12 @@ class EditorSplitView: ThemedSplitView {
 
     func splitView(_ splitView: NSSplitView, constrainSplitPosition proposedPosition: CGFloat, ofSubviewAt dividerIndex: Int) -> CGFloat {
         if dividerIndex == 0 {
-            if proposedPosition < 180 && proposedPosition > 0 {
+            if proposedPosition < Theme.Metrics.noteListCollapseSnapWidth && proposedPosition > 0 {
                 if let vc = AppContext.shared.viewController {
                     NSAnimationContext.runAnimationGroup({ context in
                         context.duration = 0.2
                         context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                        vc.hideSidebar("")
+                        vc.hideNoteList("")
                     })
                 }
                 return 0
@@ -54,7 +58,7 @@ class EditorSplitView: ThemedSplitView {
         if let vc = AppContext.shared.viewController {
             // Save notelist width when drag ends
             let notelistWidth = vc.splitView.subviews[0].frame.width
-            if notelistWidth > 0 {
+            if notelistWidth >= Theme.Metrics.noteListMinimumWidth {
                 UserDefaultsManagement.sidebarSize = Int(notelistWidth)
             }
         }

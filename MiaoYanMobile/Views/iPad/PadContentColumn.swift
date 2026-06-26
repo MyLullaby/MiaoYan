@@ -12,13 +12,13 @@ struct PadContentColumn: View {
     @State private var notes: [NoteFile] = []
     @State private var hasLoadedOnce = false
     @State private var loadTask: Task<Void, Never>?
+    @State private var previewPrefetchTask: Task<Void, Never>?
 
     @State private var searchQuery = ""
     @State private var searchResults: [NoteFile] = []
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>?
 
-    @State private var pendingDeletion: NoteFile?
     @State private var showNewNote = false
     /// Bumped on every load request. A load only commits its result if its
     /// captured generation still matches — so a stale folder's in-flight
@@ -39,7 +39,7 @@ struct PadContentColumn: View {
     }
 
     var body: some View {
-        List(selection: listSelection) {
+        List {
             if isSearchingActive {
                 searchSection
             } else {
@@ -73,37 +73,35 @@ struct PadContentColumn: View {
             guard selection == sidebarSelection else { return }
             notes = loaded
             hasLoadedOnce = true
+            if case .recent = selection {
+                prefetchInitialPreviews(for: loaded)
+            }
             resolveSelectionIfNeeded()
         }
         .sheet(isPresented: $showNewNote, onDismiss: { triggerLoad() }) {
             NewNoteView(folder: currentFolder)
-        }
-        .alert(
-            "Move note to Trash?",
-            isPresented: Binding(
-                get: { pendingDeletion != nil },
-                set: { if !$0 { pendingDeletion = nil } }
-            ),
-            presenting: pendingDeletion
-        ) { note in
-            Button("Cancel", role: .cancel) { pendingDeletion = nil }
-            Button("Move to Trash", role: .destructive) { trash(note) }
-        } message: { note in
-            Text("You can recover \u{201C}\(note.title)\u{201D} from Trash.")
         }
         .onAppear { triggerLoad() }
         .onChange(of: sidebarSelection) {
             // Clear immediately so the previous folder's notes can't linger
             // on screen while the new folder loads.
             searchQuery = ""
+            searchResults = []
+            isSearching = false
             notes = []
             hasLoadedOnce = false
+            previewPrefetchTask?.cancel()
+            // Drop the previous folder's selection so the detail column
+            // doesn't keep rendering a note that isn't in the new folder.
+            selectedNote = nil
+            selectedNoteID = ""
             triggerLoad()
         }
         .onChange(of: searchQuery) { _, newValue in runSearch(newValue) }
         .onChange(of: syncManager.revision) { triggerLoad() }
         .onDisappear {
             loadTask?.cancel()
+            previewPrefetchTask?.cancel()
             searchTask?.cancel()
         }
     }
@@ -170,12 +168,26 @@ struct PadContentColumn: View {
     }
 
     private func noteRow(_ note: NoteFile) -> some View {
-        NoteCard(note: note)
-            .overlay {
-                if selectedNote?.id == note.id {
-                    RoundedRectangle(cornerRadius: MobileTheme.cardRadius, style: .continuous)
-                        .strokeBorder(MobileTheme.accent, lineWidth: 2)
-                }
+        let snapshotRoot: URL? = {
+            if case .recent = sidebarSelection { return root }
+            return nil
+        }()
+        let isSelected = selectedNote?.id == note.id
+        return NoteCard(note: note, snapshotRoot: snapshotRoot)
+            .padding(2)
+            .background(
+                RoundedRectangle(cornerRadius: MobileTheme.cardRadius + 5, style: .continuous)
+                    .fill(isSelected ? MobileTheme.accent.opacity(0.08) : .clear)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: MobileTheme.cardRadius + 5, style: .continuous)
+                    .strokeBorder(isSelected ? MobileTheme.accent.opacity(0.24) : .clear, lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: MobileTheme.cardRadius + 5, style: .continuous))
+            .onTapGesture {
+                Haptics.tap()
+                selectedNote = note
+                selectedNoteID = note.id
             }
             .tag(note.id)
             .listRowBackground(Color.clear)
@@ -185,59 +197,9 @@ struct PadContentColumn: View {
                     top: 6, leading: MobileTheme.pagePadding,
                     bottom: 6, trailing: MobileTheme.pagePadding)
             )
-            .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                Button {
-                    Haptics.tap()
-                    togglePin(note)
-                } label: {
-                    Label(
-                        note.isPinned ? "Unpin" : "Pin",
-                        systemImage: note.isPinned ? "pin.slash" : "pin")
-                }
-                .tint(MobileTheme.warmAccent)
-            }
-            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                Button(role: .destructive) {
-                    Haptics.warning()
-                    pendingDeletion = note
-                } label: {
-                    Label("Trash", systemImage: "trash")
-                }
-            }
-            .contextMenu {
-                Button {
-                    Haptics.tap()
-                    togglePin(note)
-                } label: {
-                    Label(
-                        note.isPinned ? "Unpin" : "Pin",
-                        systemImage: note.isPinned ? "pin.slash" : "pin")
-                }
-                Button(role: .destructive) {
-                    Haptics.warning()
-                    pendingDeletion = note
-                } label: {
-                    Label("Move to Trash", systemImage: "trash")
-                }
-            }
     }
 
     // MARK: - Selection
-
-    /// `List(selection:)` reports the tapped row's `note.id`; resolve it back
-    /// to the full `NoteFile` so the detail column can render it.
-    private var listSelection: Binding<String?> {
-        Binding(
-            get: { selectedNote?.id },
-            set: { newID in
-                guard let newID,
-                    let note = visibleNotes.first(where: { $0.id == newID })
-                else { return }
-                selectedNote = note
-                selectedNoteID = note.id
-            }
-        )
-    }
 
     private func resolveSelectionIfNeeded() {
         guard selectedNote == nil, !selectedNoteID.isEmpty else { return }
@@ -305,6 +267,10 @@ struct PadContentColumn: View {
             guard generation == loadGeneration else { return }
             notes = loaded
             hasLoadedOnce = true
+            if case .recent = selection, !loaded.isEmpty {
+                RecentNotesCache.shared.save(loaded, for: root)
+                prefetchInitialPreviews(for: loaded)
+            }
             resolveSelectionIfNeeded()
         }
     }
@@ -312,10 +278,33 @@ struct PadContentColumn: View {
     private func fetchNotes(for selection: SidebarItem) async -> [NoteFile] {
         switch selection {
         case .recent:
-            return await NoteFileStore.recentNotes(in: root)
+            let loaded = await NoteFileStore.recentNotes(in: root)
+            return RecentNotesCache.shared.hydratePreviews(loaded, for: root)
         default:
             return await NoteFileStore.notes(
                 in: scopeURL(for: selection), recursive: isRecursive(selection))
+        }
+    }
+
+    private func prefetchInitialPreviews(for loaded: [NoteFile]) {
+        previewPrefetchTask?.cancel()
+        let candidates = NotePreviewPrefetcher.candidates(from: loaded)
+        guard !candidates.isEmpty else { return }
+
+        previewPrefetchTask = Task {
+            for note in candidates {
+                guard !Task.isCancelled else { return }
+                guard let preview = await NotePreviewPrefetcher.preview(for: note) else { continue }
+                guard !Task.isCancelled else { return }
+                RecentNotesCache.shared.storePreview(preview, for: note, root: root)
+                guard
+                    let index = notes.firstIndex(where: {
+                        $0.id == note.id && $0.modifiedDate == note.modifiedDate
+                    }),
+                    notes[index].preview.isEmpty
+                else { continue }
+                notes[index].preview = preview
+            }
         }
     }
 
@@ -341,33 +330,6 @@ struct PadContentColumn: View {
 
     // MARK: - Actions
 
-    private func togglePin(_ note: NoteFile) {
-        Task {
-            do {
-                try await NoteFileStore.setPinned(!note.isPinned, for: note)
-                Haptics.success()
-                triggerLoad()
-            } catch {
-                Haptics.error()
-            }
-        }
-    }
-
-    private func trash(_ note: NoteFile) {
-        Task {
-            do {
-                try await NoteFileStore.trash(note)
-                Haptics.success()
-                if selectedNote?.id == note.id {
-                    selectedNote = nil
-                    selectedNoteID = ""
-                }
-                triggerLoad()
-            } catch {
-                Haptics.error()
-            }
-        }
-    }
 }
 
 extension View {

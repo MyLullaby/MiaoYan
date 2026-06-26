@@ -55,7 +55,7 @@ public enum UserDefaultsManagement {
     static var titleFontSize = 20
     static var emptyEditTitleFontSize = 36
     static var nameFontSize = 14
-    static var searchFontSize = 14
+    static var searchFontSize = 12
     static var dateFontSize = 11
     static var marginSize = 24
     static var realSidebarSize = 138
@@ -113,8 +113,8 @@ public enum UserDefaultsManagement {
 
     private static func resolvedFontName(forKey key: String) -> String {
         if let stored = UserDefaults.standard.string(forKey: key)?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !stored.isEmpty,
-           NSFont(name: stored, size: 12) != nil
+            !stored.isEmpty,
+            NSFont(name: stored, size: 12) != nil
         {
             return stored
         }
@@ -148,11 +148,7 @@ public enum UserDefaultsManagement {
     }
     static var lastProject: Int {
         get {
-            if let lastProject = UserDefaults.standard.object(forKey: Constants.LastProject) {
-                return lastProject as! Int
-            } else {
-                return 0
-            }
+            UserDefaults.standard.object(forKey: Constants.LastProject) as? Int ?? 0
         }
         set {
             UserDefaults.standard.set(newValue, forKey: Constants.LastProject)
@@ -241,6 +237,11 @@ public enum UserDefaultsManagement {
         set {
             UserDefaults.standard.set(newValue, forKey: Constants.IsFirstLaunch)
         }
+    }
+
+    static var hasCreatedInitContent: Bool {
+        get { UserDefaults.standard.bool(forKey: "hasCreatedInitContent") }
+        set { UserDefaults.standard.set(newValue, forKey: "hasCreatedInitContent") }
     }
 
     static var hasFixedInitialization: Bool {
@@ -467,11 +468,7 @@ public enum UserDefaultsManagement {
     }
     static var fontSize: Int {
         get {
-            if let returnFontSize = UserDefaults.standard.object(forKey: Constants.FontSizeKey) {
-                return returnFontSize as! Int
-            } else {
-                return DefaultFontSize
-            }
+            UserDefaults.standard.object(forKey: Constants.FontSizeKey) as? Int ?? DefaultFontSize
         }
         set {
             UserDefaults.standard.set(newValue, forKey: Constants.FontSizeKey)
@@ -493,7 +490,7 @@ public enum UserDefaultsManagement {
             if let result = UserDefaults.standard.object(forKey: Constants.PreviewLocation) as? String {
                 return result
             }
-            return "Begin"
+            return "Editing"
         }
         set {
             UserDefaults.standard.set(newValue, forKey: Constants.PreviewLocation)
@@ -868,11 +865,12 @@ public enum UserDefaultsManagement {
 
     static var sort: SortBy {
         get {
-            if let result = UserDefaults.standard.object(forKey: "sortBy"), let sortBy = SortBy(rawValue: result as! String) {
-                return sortBy
-            } else {
+            guard let raw = UserDefaults.standard.object(forKey: "sortBy") as? String,
+                let sortBy = SortBy(rawValue: raw)
+            else {
                 return .creationDate
             }
+            return sortBy
         }
         set {
             UserDefaults.standard.set(newValue.rawValue, forKey: "sortBy")
@@ -899,10 +897,7 @@ public enum UserDefaultsManagement {
     static var restoreCursorPosition = true
     static var imagesWidth: Float {
         get {
-            if let result = UserDefaults.standard.object(forKey: Constants.ImagesWidthKey) {
-                return result as! Float
-            }
-            return 300
+            UserDefaults.standard.object(forKey: Constants.ImagesWidthKey) as? Float ?? 300
         }
         set {
             UserDefaults.standard.set(newValue, forKey: Constants.ImagesWidthKey)

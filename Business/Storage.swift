@@ -732,8 +732,38 @@ class Storage {
         noteList.count
     }
 
+    /// Pure decision the storage takes on first launch / each launch about
+    /// whether to seed the bundled demo folders. Extracted as a static helper
+    /// so the case matrix (specifically the V3.5.1 regression `13964acd` where
+    /// existing users with non-empty noteLists never got the initialized flag
+    /// set) is regression-testable without spinning up a real Storage.
+    enum InitContentDecision: Equatable {
+        case skip  // already initialized; nothing to do
+        case markInitialized  // user has notes; just record the flag
+        case createInitFolders  // empty noteList + flag unset; seed demo
+    }
+
+    static func decideInitContent(noteListIsEmpty: Bool, hasCreatedInitContent: Bool) -> InitContentDecision {
+        if !noteListIsEmpty { return .markInitialized }
+        if hasCreatedInitContent { return .skip }
+        return .createInitFolders
+    }
+
     func checkFirstRun() -> Bool {
-        guard noteList.isEmpty, let resourceURL = Bundle.main.resourceURL else {
+        switch Storage.decideInitContent(
+            noteListIsEmpty: noteList.isEmpty,
+            hasCreatedInitContent: UserDefaultsManagement.hasCreatedInitContent
+        ) {
+        case .markInitialized:
+            UserDefaultsManagement.hasCreatedInitContent = true
+            return false
+        case .skip:
+            return false
+        case .createInitFolders:
+            break
+        }
+
+        guard let resourceURL = Bundle.main.resourceURL else {
             return false
         }
 
@@ -799,6 +829,7 @@ class Storage {
             return false
         }
 
+        UserDefaultsManagement.hasCreatedInitContent = true
         return true
     }
 
@@ -935,6 +966,7 @@ class Storage {
                         let resolvedValues = try? resolved.resourceValues(forKeys: [.isPackageKey]),
                         !(resolvedValues.isPackage ?? true)
                     {
+                        if isAttachmentOnlyFolder(url: resolved) { continue }
                         subDirs.append(fileURL as NSURL)
                     }
                     continue
@@ -943,6 +975,7 @@ class Storage {
                 if let isDirectory = resourceValues.isDirectory, isDirectory,
                     let isPackage = resourceValues.isPackage, !isPackage
                 {
+                    if isAttachmentOnlyFolder(url: fileURL) { continue }
                     subDirs.append(fileURL as NSURL)
                 }
             } catch {
@@ -951,6 +984,33 @@ class Storage {
         }
 
         return subDirs
+    }
+
+    /// True when `url` is a leaf folder that holds only attachment-style files:
+    /// at least one file, no note file (md/markdown/txt), and no subfolder. Such
+    /// folders (an `images` / `videos` dir of inline media, regardless of name)
+    /// carry nothing to navigate to, so the sidebar hides them. Empty folders and
+    /// folders that contain notes or subfolders return false, so a freshly created
+    /// folder still appears. Immediate children only, no recursion, so a large
+    /// media dir costs one shallow read and symlink loops are impossible.
+    func isAttachmentOnlyFolder(url: URL) -> Bool {
+        let keys: [URLResourceKey] = [.isDirectoryKey, .isPackageKey]
+        let options: FileManager.DirectoryEnumerationOptions = [.skipsHiddenFiles, .skipsPackageDescendants, .skipsSubdirectoryDescendants]
+        guard let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: keys, options: options) else {
+            return false
+        }
+
+        var hasFile = false
+        for case let fileURL as URL in enumerator {
+            let values = try? fileURL.resourceValues(forKeys: Set(keys))
+            // A subfolder means this is a structural folder, not a leaf media dump.
+            if values?.isDirectory == true { return false }
+            // A note file means there is something to navigate to; keep it.
+            if allowedExtensions.contains(fileURL.pathExtension.lowercased()) { return false }
+            hasFile = true
+        }
+
+        return hasFile
     }
 
     public func getCurrentProject() -> Project? {
@@ -1238,5 +1298,3 @@ class Storage {
         }
     }
 }
-
-extension String: @retroactive Error {}

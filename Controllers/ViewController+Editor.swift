@@ -101,9 +101,12 @@ extension ViewController {
         }
         lastEnablePreviewTime = now
 
+        let editorScrollRatio = getScrollTop()
+        let editorVisibleLine = editorTopLine()
+
         if !sessionPreviewMode {
             savedEditorSelection = editArea.selectedRange()
-            savedEditorScrollRatio = getScrollTop()
+            savedEditorScrollRatio = editorScrollRatio
             savedEditorNoteURL = EditTextView.note?.url
         }
 
@@ -174,9 +177,8 @@ extension ViewController {
             self.editArea.window?.makeFirstResponder(self.editArea.markdownView)
         }
         if UserDefaultsManagement.previewLocation == "Editing", !sessionIsExporting {
-            let scrollPre = getScrollTop()
             editArea.markdownView?.runWhenPreviewReady { [weak self] in
-                self?.editArea.markdownView?.scrollToPosition(pre: scrollPre)
+                self?.editArea.markdownView?.scrollToLine(editorVisibleLine, fallbackRatio: editorScrollRatio)
             }
         }
     }
@@ -236,7 +238,6 @@ extension ViewController {
         }
     }
 
-    // swiftlint:disable:next cyclomatic_complexity
     func disablePreview() {
         guard !sessionMagicPPTMode else { return }
 
@@ -528,10 +529,10 @@ extension ViewController {
         let currentSidebarWidth = sidebarWidth
         let currentNotelistWidth = notelistWidth
 
-        if currentSidebarWidth > 86 {
+        if currentSidebarWidth > Theme.Metrics.sidebarCollapseSnapWidth {
             UserDefaultsManagement.realSidebarSize = Int(currentSidebarWidth)
         }
-        if currentNotelistWidth > 0 {
+        if currentNotelistWidth >= Theme.Metrics.noteListMinimumWidth {
             UserDefaultsManagement.sidebarSize = Int(currentNotelistWidth)
         }
         if let clipView = notesTableView.superview as? NSClipView {
@@ -549,10 +550,8 @@ extension ViewController {
         if notelistWidth == 0 { showNoteList("") }
         checkTitlebarTopConstraint()
 
-        if let savedPosition = savedPresentationScrollPosition,
-            let clipView = notesTableView.superview as? NSClipView
-        {
-            clipView.setBoundsOrigin(savedPosition)
+        if let savedPosition = savedPresentationScrollPosition {
+            notesTableView.restoreScrollOrigin(savedPosition)
             savedPresentationScrollPosition = nil
         }
     }
@@ -1196,6 +1195,58 @@ extension ViewController {
     /// disabled otherwise via `validateMenuItem`.
     @IBAction func toggleTOC(_ sender: Any) {
         editArea.markdownView?.toggleTOC()
+    }
+
+    // MARK: - Font Zoom
+
+    /// Shared lower/upper bounds for the ⌘=/⌘-/⌘0 font zoom, matching the
+    /// discrete range offered by the typography preferences popup so the two
+    /// entry points stay consistent.
+    private var zoomFontSizeRange: ClosedRange<Int> { 12...28 }
+
+    /// ⌘+ (and ⌘= via `handleKeyDown`): grow editor and preview fonts together.
+    @IBAction func zoomInFontSize(_ sender: Any) {
+        adjustFontSize(by: 1)
+    }
+
+    /// ⌘-: shrink editor and preview fonts together.
+    @IBAction func zoomOutFontSize(_ sender: Any) {
+        adjustFontSize(by: -1)
+    }
+
+    /// ⌘0: restore editor and preview fonts to their default sizes.
+    @IBAction func resetFontSize(_ sender: Any) {
+        let alreadyDefault =
+            UserDefaultsManagement.fontSize == UserDefaultsManagement.DefaultFontSize
+            && UserDefaultsManagement.previewFontSize == UserDefaultsManagement.DefaultPreviewFontSize
+        guard !alreadyDefault else { return }
+        UserDefaultsManagement.fontSize = UserDefaultsManagement.DefaultFontSize
+        UserDefaultsManagement.previewFontSize = UserDefaultsManagement.DefaultPreviewFontSize
+        applyFontSizeChange(announcing: UserDefaultsManagement.DefaultFontSize)
+    }
+
+    /// Move the editor font (and the preview font in lockstep) by `delta`,
+    /// gating on the editor size so both surfaces stay clamped to the same
+    /// range. No-ops silently once the editor hits a bound.
+    func adjustFontSize(by delta: Int) {
+        let current = UserDefaultsManagement.fontSize
+        let newSize = clampToZoomRange(current + delta)
+        guard newSize != current else { return }
+        UserDefaultsManagement.fontSize = newSize
+        UserDefaultsManagement.previewFontSize = clampToZoomRange(UserDefaultsManagement.previewFontSize + delta)
+        applyFontSizeChange(announcing: newSize)
+    }
+
+    private func clampToZoomRange(_ value: Int) -> Int {
+        min(max(value, zoomFontSizeRange.lowerBound), zoomFontSizeRange.upperBound)
+    }
+
+    /// Reuse the preferences font-apply path (refresh highlighter + fonts, then
+    /// rebuild the editor and bounce the preview if it is live) and surface the
+    /// new size so the change is visible even in plain editing mode.
+    private func applyFontSizeChange(announcing size: Int) {
+        EditorSettings().applyChanges()
+        toast(message: String(format: I18n.str("Font size: %d"), size), style: .info)
     }
 
     @IBAction func toggleMagicPPT(_ sender: Any) {

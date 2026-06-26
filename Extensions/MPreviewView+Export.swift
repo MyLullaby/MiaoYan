@@ -282,7 +282,7 @@ extension MPreviewView {
             """
 
         evaluateJavaScript(printCSS) { _, _ in
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + UIDelay.short) {
                 completion()
             }
         }
@@ -750,7 +750,7 @@ extension MPreviewView {
             }
 
             if checkCount >= maxChecks {
-                print("[Export] Image loading timeout after \\(checkCount) checks, proceeding anyway")
+                print("[Export] Image loading timeout after \(checkCount) checks, proceeding anyway")
                 completion()
                 return
             }

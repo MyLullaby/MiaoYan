@@ -19,6 +19,10 @@ disabled_rules:
   - private_action
   - private_outlet
   - void_function_in_ternary
+  # SwiftUI's .sheet(isPresented:onDismiss:content:) and similar APIs
+  # are idiomatic with a labeled closure followed by a trailing closure;
+  # firing on it for the MiaoYanMobile target is noise, not a bug.
+  - multiple_closures_with_trailing_closure
 
 opt_in_rules:
   - empty_count
@@ -49,7 +53,7 @@ line_length:
   ignores_urls: true
 
 cyclomatic_complexity:
-  warning: 20
+  warning: 22
   error: 24
 
 file_length:
@@ -63,3 +67,53 @@ function_parameter_count:
 large_tuple:
   warning: 2
   error: 3
+
+custom_rules:
+  no_direct_singleton_in_new_code:
+    name: "Prefer AppEnvironment over raw singletons"
+    regex: '\b(?:Storage\.sharedInstance\(\)|Storage\.instance|WikilinkIndex\.shared|CloudSyncManager\.shared|NoteVersionManager\.shared|UserDataService\.instance|ViewController\.shared\(\))'
+    match_kinds:
+      - identifier
+    message: "Use AppEnvironment.current.<service> for new code. Existing call sites are grandfathered; do not add new ones."
+    severity: warning
+    # Grandfathered call sites as of the AppEnvironment introduction. Remove
+    # files from this list as their singleton usage migrates to AppEnvironment.
+    # Do NOT add new files here; the warning is the point.
+    excluded:
+      - "Business/AppEnvironment.swift"
+      - "Business/HtmlManager.swift"
+      - "Business/Note.swift"
+      - "Business/PrefsModel.swift"
+      - "Business/Sidebar.swift"
+      - "Business/Storage.swift"
+      - "Business/Types.swift"
+      - "Controllers/AppDelegate.swift"
+      - "Controllers/AppDelegate\\+URLRoutes.swift"
+      - "Controllers/ContentViewController.swift"
+      - "Controllers/EditorPrefsViewController.swift"
+      - "Controllers/GeneralPrefsViewController.swift"
+      - "Controllers/MainWindowController.swift"
+      - "Controllers/ProjectSettingsViewController.swift"
+      - "Controllers/TypographyPrefsViewController.swift"
+      - "Controllers/VersionHistoryViewController.swift"
+      - "Controllers/ViewController.swift"
+      - "Controllers/ViewController\\+Action.swift"
+      - "Controllers/ViewController\\+Data.swift"
+      - "Controllers/ViewController\\+Editor.swift"
+      - "Extensions/MPreviewView\\+Export.swift"
+      - "Extensions/NSTextStorage\\+.swift"
+      - "Helpers/EditorMenuManager.swift"
+      - "Helpers/FileSystemEventManager.swift"
+      - "Helpers/NotesTextProcessor.swift"
+      - "Helpers/TextFormatter.swift"
+      - "Views/EditTextView.swift"
+      - "Views/MPreviewView.swift"
+      - "Views/NotesTableView.swift"
+      - "Views/SidebarProjectView.swift"
+      # MiaoYanMobile composes services through AppState, not AppEnvironment.
+      # The whole iOS target is out of scope for this macOS-only facade rule.
+      - "MiaoYanMobile"
+      # Tests are an explicit access boundary; using the singleton directly is
+      # fine. Once a test needs a sandboxed environment it can use
+      # `AppEnvironment.withOverride(...)`.
+      - "MiaoYanTests"

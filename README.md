@@ -6,7 +6,7 @@
   <div align="center">
     <a href="https://twitter.com/HiTw93" target="_blank">
       <img alt="Twitter Follow" src="https://img.shields.io/badge/follow-Tw93-red?style=flat-square&logo=Twitter"></a>
-    <a href="https://t.me/+GclQS9ZnxyI2ODQ1" target="_blank">
+    <a href="https://t.me/+9f9gf4ZrFSQ2OWVl" target="_blank">
       <img alt="Telegram" src="https://img.shields.io/badge/chat-Telegram-blueviolet?style=flat-square&logo=Telegram"></a>
     <a href="https://github.com/tw93/MiaoYan/releases" target="_blank">
       <img alt="GitHub Downloads" src="https://img.shields.io/github/downloads/tw93/MiaoYan/total.svg?style=flat-square"></a>
@@ -52,7 +52,7 @@ MiaoYan provides a command-line interface for quick note operations.
 curl -fsSL https://raw.githubusercontent.com/tw93/MiaoYan/main/scripts/install.sh | bash
 
 # Usage
-miao open <title|path>    # Open note
+miao open <title|path>    # Open note or folder
 miao new <title> [text]   # Create new note
 miao search <query>       # Search notes in terminal
 miao list [folder]        # List top-level folders, or markdown in folder
@@ -77,11 +77,16 @@ Why not WYSIWYG like Typora? We prioritize pure Markdown editing experience, and
 
 ## Support
 
+- The most direct way to support me is getting [Mole for Mac](https://mole.fit), my paid Mac cleanup app.
 - If MiaoYan helped you, [share it](https://twitter.com/intent/tweet?url=https://github.com/tw93/MiaoYan&text=MiaoYan%20-%20A%20fast%2C%20elegant%20Markdown%20editor%20for%20Mac.) with friends or give it a star.
 - Got ideas or bugs? Open an issue or PR, feel free to contribute your best AI model.
 - I have two cats, TangYuan and Coke. If you think MiaoYan delights your life, you can feed them <a href="https://cats.tw93.fun?name=MiaoYan" target="_blank">canned food 🥩</a>.
 
+<details>
+<summary>These lovely people already did 🐱</summary>
+<br/>
 <a href="https://cats.tw93.fun?name=MiaoYan"><img src="https://cdn.jsdelivr.net/gh/tw93/sponsors@main/assets/sponsors.svg" width="1000" loading="lazy" /></a>
+</details>
 
 ## Acknowledgments
 
